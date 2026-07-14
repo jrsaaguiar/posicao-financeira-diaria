@@ -47,7 +47,7 @@ def normalizar_tipo(titulo):
     if 'GARANTIA' in t or 'VENDA GARANTIA' in t: return 'GARANTIA'
     if 'BANCO' in t: return 'BANCO'
     if 'CARTAO' in t or 'CARTÕES' in t or 'CARTAO DE CREDITO' in t or 'CREDITO' in t: return 'CARTAO'
-    if 'FUNDAO NOVOS' in t or 'FUNDAO' in t: return 'FUNDAO NOVOS' # <- OK, está na ordem certa
+    if 'FUNDAO NOVOS' in t or 'FUNDAO' in t: return 'FUNDAO NOVOS'
     if 'NOVOS PAGOS' in t or 'NOVOS.PAGOS' in t: return 'NOVOS PAGOS'
     if 'USADOS PAGOS' in t or 'USADOS.PAGOS' in t or 'USADOS' in t: return 'USADOS PAGOS'
     if 'FIDIC' in t: return 'FIDIC'
@@ -62,16 +62,17 @@ def normalizar_tipo(titulo):
 ITENS = [
     ('CARTEIRA', 'CARTEIRA'), ('MERCADO PAGO', 'MERCADO PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
-    ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),('FUNDAO NOVOS', 'FUNDAO.NOVOS'), # <- padronizei com ponto
+    ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),('FUNDAO NOVOS', 'FUNDAO.NOVOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
     ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),('ADIANTAMENTO', 'ADIANTAMENTOS'),
     ('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
 
 ITENS_MANUAIS = [
-    ('NOVOS PAGOS', 'NOVOS PAGOS'), ('USADOS PAGOS', 'USADOS PAGOS'),('FUNDAO NOVOS', 'FUNDAO NOVOS'),
+    ('NOVOS PAGOS', 'NOVOS.PAGOS'), ('USADOS PAGOS', 'USADOS.PAGOS'),('FUNDAO NOVOS', 'FUNDAO.NOVOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
 ]
+ITENS_COM_QTD = ['NOVOS PAGOS', 'USADOS PAGOS', 'FUNDAO NOVOS'] # <- só esses tem qtd
 
 def gerar_excel(df_para_exportar, empresas_selecionadas):
     output = BytesIO()
@@ -101,8 +102,8 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
         linha_temp = 3; col_inicio = 1
         for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
             if emp not in empresas_selecionadas: col_inicio += 3; continue
-            worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
-            worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
+            worksheet.column_dimensions[get_column_letter(col_inicio)].width = 25
+            worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 25
             worksheet.cell(row=linha_temp, column=col_inicio, value='DESCRICAO').font = bold; worksheet.cell(row=linha_temp, column=col_inicio).fill = header_fill; worksheet.cell(row=linha_temp, column=col_inicio).border = border_fina
             worksheet.cell(row=linha_temp, column=col_inicio+1, value='VALORES').font = bold; worksheet.cell(row=linha_temp, column=col_inicio+1).fill = header_fill; worksheet.cell(row=linha_temp, column=col_inicio+1).border = border_fina
             col_inicio += 3
@@ -113,13 +114,18 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
             for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
                 if emp not in empresas_selecionadas: col_inicio += 3; continue
                 total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                qtd = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Qtd'].sum()
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
 
+                texto_valor = formatar_br(total)
+                if item_chave in ITENS_COM_QTD and qtd > 0: # <- ADICIONA QTD NO TEXTO
+                    texto_valor = f"{texto_valor} ({int(qtd)} veic)"
+
                 cell_desc = worksheet.cell(row=linha_dados, column=col_inicio, value=item_nome); cell_desc.border = border_fina
-                cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'; cell_valor.border = border_fina
+                cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=texto_valor); cell_valor.alignment = right; cell_valor.border = border_fina
                 col_inicio += 3
             linha_dados += 1
 
@@ -133,14 +139,11 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
-
-                if item_chave == 'OBRIGACOES':
-                    total_geral -= total
-                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
-                    total_geral += total
+                if item_chave == 'OBRIGACOES': total_geral -= total
+                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: total_geral += total
 
             worksheet.cell(row=linha_dados, column=col_inicio, value='TOTAL').font = bold; worksheet.cell(row=linha_dados, column=col_inicio).border = border_fina
-            cell_total = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'; cell_total.border = border_fina
+            cell_total = worksheet.cell(row=linha_dados, column=col_inicio+1, value=formatar_br(total_geral)); cell_total.font = bold; cell_total.alignment = right; cell_total.border = border_fina
             col_inicio += 3
 
     return output.getvalue()
@@ -155,9 +158,9 @@ manual_file = st.file_uploader("📄 valores_manuais.json", type=['json'])
 uploaded_files = st.file_uploader("📁 Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 
 valores_iniciais = {
-    'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
-    'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
-    'EUSEBIO': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
+    'MATRIZ': {'NOVOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'USADOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'FUNDAO NOVOS': {'valor': '0,00', 'qtd': '0'}, 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
+    'WS': {'NOVOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'USADOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'FUNDAO NOVOS': {'valor': '0,00', 'qtd': '0'}, 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
+    'EUSEBIO': {'NOVOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'USADOS PAGOS': {'valor': '0,00', 'qtd': '0'}, 'FUNDAO NOVOS': {'valor': '0,00', 'qtd': '0'}, 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
 }
 if manual_file is not None:
     try:
@@ -167,14 +170,16 @@ if manual_file is not None:
             dados_norm[emp] = {}
             for chave, valor in itens.items():
                 chave_norm = normalizar_chave_manual(chave)
-                dados_norm[emp][chave_norm] = valor
+                if chave_norm in ITENS_COM_QTD and isinstance(valor, dict):
+                    dados_norm[emp][chave_norm] = valor
+                else:
+                    dados_norm[emp][chave_norm] = {'valor': valor, 'qtd': '0'} if chave_norm in ITENS_COM_QTD else valor
         valores_iniciais.update(dados_norm)
     except: pass
 
-# CORRECAO DO KEYERROR: garante que FUNDAO NOVOS existe
 for emp in valores_iniciais:
-    if 'FUNDAO NOVOS' not in valores_iniciais[emp]:
-        valores_iniciais[emp]['FUNDAO NOVOS'] = '0,00'
+    for item in ITENS_COM_QTD:
+        if item not in valores_iniciais[emp]: valores_iniciais[emp][item] = {'valor': '0,00', 'qtd': '0'}
 
 if uploaded_files:
     dfs = {file.name: pd.read_excel(file) for file in uploaded_files}
@@ -194,7 +199,7 @@ if uploaded_files:
                     saldo = converter_valor_br(row['Saldo'])
                     if titulo == '' or titulo.upper() == 'NAN' or saldo <= 0: continue
                     tipo = normalizar_tipo(agente)
-                    dados.append({'Tipo de Título': tipo, 'Empresa': empresa_norm, 'Saldo': saldo})
+                    dados.append({'Tipo de Título': tipo, 'Empresa': empresa_norm, 'Saldo': saldo, 'Qtd': 0})
                 except: continue
         return pd.DataFrame(dados) if dados else pd.DataFrame()
 
@@ -213,7 +218,7 @@ if uploaded_files:
                     elif 'MATRIZ' in emp.upper(): obrig_dict['MATRIZ'] = val
                     elif 'WS' in emp.upper(): obrig_dict['WS'] = val
                 break
-        linhas = [{'Tipo de Título': 'OBRIGACOES', 'Empresa': e, 'Saldo': v} for e,v in obrig_dict.items() if v > 0]
+        linhas = [{'Tipo de Título': 'OBRIGACOES', 'Empresa': e, 'Saldo': v, 'Qtd': 0} for e,v in obrig_dict.items() if v > 0]
         return pd.DataFrame(linhas)
 
     def carregar_creditos_nao_identificados():
@@ -225,7 +230,7 @@ if uploaded_files:
             emp = detectar_empresa(str(df_cred_raw.iloc[i, 2]))
             sal = converter_valor_br(df_cred_raw.iloc[i, df_cred_raw.shape[1]-1])
             if emp in credito_dict and sal > 0: credito_dict[emp] += sal
-        linhas = [{'Tipo de Título': 'TRANSITORIA', 'Empresa': e, 'Saldo': v} for e,v in credito_dict.items() if v > 0]
+        linhas = [{'Tipo de Título': 'TRANSITORIA', 'Empresa': e, 'Saldo': v, 'Qtd': 0} for e,v in credito_dict.items() if v > 0]
         return pd.DataFrame(linhas)
 
     def carregar_adiantamentos():
@@ -236,15 +241,20 @@ if uploaded_files:
             emp = detectar_empresa(str(df_ad_raw.iloc[i, 3]))
             sal = converter_valor_br(str(df_ad_raw.iloc[i, 6]))
             if emp in adiant_dict: adiant_dict[emp] += sal
-        linhas = [{'Tipo de Título': 'ADIANTAMENTO', 'Empresa': e, 'Saldo': v} for e,v in adiant_dict.items() if v > 0]
+        linhas = [{'Tipo de Título': 'ADIANTAMENTO', 'Empresa': e, 'Saldo': v, 'Qtd': 0} for e,v in adiant_dict.items() if v > 0]
         return pd.DataFrame(linhas)
 
     def carregar_manuais(valores_digitados):
         dados = []
         for empresa, itens in valores_digitados.items():
-            for tipo, valor_str in itens.items():
-                valor = converter_valor_br(valor_str)
-                if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
+            for tipo, dados_item in itens.items():
+                if isinstance(dados_item, dict):
+                    valor = converter_valor_br(dados_item['valor'])
+                    qtd = int(converter_valor_br(dados_item['qtd']))
+                else:
+                    valor = converter_valor_br(dados_item)
+                    qtd = 0
+                if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor, 'Qtd': qtd})
         return pd.DataFrame(dados)
 
     with st.expander("📝 Lançamento Manual - Clique para abrir", expanded=True):
@@ -257,7 +267,15 @@ if uploaded_files:
                 st.markdown(f"**{emp}**")
                 for item_chave, item_nome in ITENS_MANUAIS:
                     st.markdown(f"{item_nome}")
-                    valores_digitados[emp][item_chave] = st.text_input(label="", value=valores_iniciais[emp][item_chave], key=f"{emp}_{item_chave}", label_visibility="collapsed")
+                    if item_chave in ITENS_COM_QTD:
+                        c1, c2 = st.columns([2,1])
+                        with c1:
+                            val = st.text_input("Valor", value=valores_iniciais[emp][item_chave]['valor'], key=f"{emp}_{item_chave}_val", label_visibility="collapsed")
+                        with c2:
+                            qtd = st.text_input("Qtd", value=valores_iniciais[emp][item_chave]['qtd'], key=f"{emp}_{item_chave}_qtd", label_visibility="collapsed")
+                        valores_digitados[emp][item_chave] = {'valor': val, 'qtd': qtd}
+                    else:
+                        valores_digitados[emp][item_chave] = st.text_input(label="", value=valores_iniciais[emp][item_chave], key=f"{emp}_{item_chave}", label_visibility="collapsed")
 
         json_para_salvar = json.dumps(valores_digitados, indent=4, ensure_ascii=False)
         st.download_button(label="💾 Salvar valores_manuais.json", data=json_para_salvar, file_name="valores_manuais.json", mime="application/json")
@@ -268,6 +286,7 @@ if uploaded_files:
         if lista_df:
             df = pd.concat(lista_df, ignore_index=True)
             df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
+            df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
             empresas = df['Empresa'].unique()
             novas_linhas = []
             for emp in empresas:
@@ -275,7 +294,7 @@ if uploaded_files:
                 adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTO')]['Saldo'].sum()
                 if trans > 0:
                     dif = adiant - trans
-                    if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif})
+                    if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0})
             if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
             st.session_state['df_final'] = df
             st.success("Dados carregados!")
@@ -298,17 +317,19 @@ if uploaded_files:
                 total_geral = 0.0
                 for item_chave, item_nome in ITENS:
                     total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
+                    qtd = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Qtd'].sum()
                     if item_chave == 'DIF_TRANS_ADIANT':
                         trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
                         adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
                         total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
 
-                    if item_chave == 'OBRIGACOES':
-                        total_geral -= total
-                    elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
-                        total_geral += total
+                    texto_valor = formatar_br(total)
+                    if item_chave in ITENS_COM_QTD and qtd > 0: # <- MOSTRA QTD AQUI
+                        texto_valor = f"{texto_valor} ({int(qtd)} veic)"
 
-                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
+                    if item_chave == 'OBRIGACOES': total_geral -= total
+                    elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: total_geral += total
+                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": texto_valor})
 
                 dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
                 df_mostrar = pd.DataFrame(dados_tabela)
