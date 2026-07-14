@@ -313,7 +313,7 @@ if uploaded_files:
                     if item_chave == 'DIF_TRANS_ADIANT':
                         trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
                         adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
-                        total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                        total = adiant_valor - trans_valor
                     
                     valores_por_item[item_chave] = total
                     if item_chave == 'OBRIGACOES': total_geral -= total
