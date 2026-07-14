@@ -267,57 +267,58 @@ if uploaded_files:
         else:
             st.error("Não consegui ler os dados dos arquivos")
 
-    # ================= TABELA + DOWNLOAD =================
-    if 'df_final' in st.session_state:
-        df = st.session_state['df_final']
-    
-        st.markdown("### POSIÇÃO FINANCEIRA DIÁRIA")
-        c1, c2, c3 = st.columns([3, 1, 1])
-        with c2: st.markdown("**DATA**")
-        with c3: st.markdown(f"**{date.today().strftime('%d/%m/%Y')}**")
-        st.divider()
-    
-        # 1. PRIMEIRO CRIA OS FILTROS
-        with st.sidebar:
-            st.markdown("### Filtros")
-            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
+        # ================= TABELA + DOWNLOAD =================
+        if 'df_final' in st.session_state:
+            df = st.session_state['df_final']
+        
+            st.markdown("### POSIÇÃO FINANCEIRA DIÁRIA")
+            c1, c2, c3 = st.columns([3, 1, 1])
+            with c2: st.markdown("**DATA**")
+            with c3: st.markdown(f"**{date.today().strftime('%d/%m/%Y')}**")
             st.divider()
-            st.markdown("### Exportar")
-    
-        # 2. DEPOIS MONTA A TABELA USANDO O FILTRO
-        empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']
-        for emp in empresas_ordem:
-            if emp not in empresas_selecionadas: continue
-            
-            st.markdown(f"#### {emp}")
-            valores_emp = {}
-            total_geral = 0.0
-            
-            for item_chave, item_nome in ITENS:
-                total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
+        
+            # 1. PRIMEIRO CRIA OS FILTROS
+            with st.sidebar:
+                st.markdown("### Filtros")
+                empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
+                st.divider()
+                st.markdown("### Exportar")
+        
+            # 2. DEPOIS MONTA A TABELA USANDO O FILTRO
+            empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']
+            for emp in empresas_ordem:
+                if emp not in empresas_selecionadas: continue
                 
-                if item_chave == 'DIF_TRANS_ADIANT':
-                    trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
-                    adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
-                    total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                st.markdown(f"#### {emp}")
+                valores_emp = {}
+                total_geral = 0.0
                 
-                valores_emp[item_chave] = total
-                if item_chave == 'OBRIGACOES': total_geral -= total
-                else: total_geral += total
+                for item_chave, item_nome in ITENS:
+                    total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
+                    
+                    if item_chave == 'DIF_TRANS_ADIANT':
+                        trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
+                        adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
+                        total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                    
+                    valores_emp[item_chave] = total
+                    if item_chave == 'OBRIGACOES': total_geral -= total
+                    else: total_geral += total
+                    
+                    col1, col2 = st.columns([3,1])
+                    with col1: st.write(item_nome)
+                    with col2: st.write(formatar_br(total))
                 
-                col1, col2 = st.columns([3,1])
-                with col1: st.write(item_nome)
-                with col2: st.write(formatar_br(total))
-            
-            st.markdown(f"**TOTAL {emp}: {formatar_br(total_geral)}**")
-            st.divider()
-    
-        # 3. POR ULTIMO O BOTAO DE DOWNLOAD
-        with st.sidebar:
-            excel_data = gerar_excel(df, empresas_selecionadas)
-            st.download_button(
-                label="📥 Baixar Excel",
-                data=excel_data,
-                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                st.markdown(f"**TOTAL {emp}: {formatar_br(total_geral)}**")
+                st.divider()
+        
+            # 3. POR ULTIMO O BOTAO DE DOWNLOAD
+            with st.sidebar:
+                excel_data = gerar_excel(df, empresas_selecionadas)
+                st.download_button(
+                    label="📥 Baixar Excel",
+                    data=excel_data,
+                    file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+    # FALTAVA ESSA LINHA AQUI PRA FECHAR O "if uploaded_files:"
