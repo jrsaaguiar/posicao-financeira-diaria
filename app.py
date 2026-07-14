@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import date
 from io import BytesIO
 import openpyxl
-from openpyxl.utils import get_column_letter # <-- E ESSA
+from openpyxl.utils import get_column_letter
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
@@ -41,7 +41,7 @@ def normalizar_tipo(titulo):
     if 'NOVOS PAGOS' in t or 'NOVOS.PAGOS' in t: return 'NOVOS PAGOS'
     if 'USADOS PAGOS' in t or 'USADOS.PAGOS' in t or 'USADOS' in t: return 'USADOS PAGOS'
     if 'FIDIC' in t: return 'FIDIC'
-    if 'H.B.PECAS' in t or 'H.B.PECAS' in t or 'PECAS' in t: return 'H.B.PECAS'
+    if 'H.B.PECAS' in t or 'HB PECAS' in t or 'PECAS' in t: return 'H.B.PECAS'
     if 'ESTOQUE PECAS' in t or 'EST.PECAS' in t: return 'ESTOQUE PECAS'
     if 'OBRIG' in t: return 'OBRIGACOES'
     if 'TRANSITORIA' in t: return 'TRANSITORIA'
@@ -50,7 +50,7 @@ def normalizar_tipo(titulo):
     return 'OUTROS'
 
 ITENS = [
-    ('CARTEIRA', 'CARTEIRA'), ('MERCADO.PAGO', 'MERCADO.PAGO'), ('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
+    ('CARTEIRA', 'CARTEIRA'),  ('MERCADO.PAGO', 'MERCADO.PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
     ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
@@ -67,7 +67,7 @@ uploaded_files = st.file_uploader(
 
 manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
 
-# Carrega valores_manuais.json
+# Carrega valores_manuais.json - CORRIGIDO
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
@@ -218,6 +218,14 @@ if uploaded_files:
             empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
             st.divider()
             st.markdown("### Exportar")
+            
+            excel_data = gerar_excel(df, empresas_selecionadas)
+            st.download_button(
+                label="📥 Baixar Excel",
+                data=excel_data,
+                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
             def gerar_excel(df_para_exportar, empresas_selecionadas):
                 output = BytesIO()
@@ -231,7 +239,6 @@ if uploaded_files:
                     bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
                     
                     linha_atual = 1
-                    # CORREÇÃO 1: Mesclar até coluna 8 agora
                     worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
                     cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
                     worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
@@ -239,7 +246,7 @@ if uploaded_files:
                     linha_atual += 1
                     empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
                     for emp in empresas_ordem:
-                        if emp not in empresas_selecionadas: col_inicio += 3; continue # PULA 3 COLUNAS
+                        if emp not in empresas_selecionadas: col_inicio += 3; continue
                         
                         linha_temp = linha_atual
                         worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
@@ -256,9 +263,8 @@ if uploaded_files:
                             else: total_geral += total
                             
                             worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
-                            cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00' # Formato R$
+                            cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'
                             
-                            # CORREÇÃO 2: Aumentar largura da coluna
                             worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
                             worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
                             
@@ -267,6 +273,6 @@ if uploaded_files:
                         worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
                         cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
                         
-                        col_inicio += 3 # CORREÇÃO 3: Pula 2 colunas + 1 vazia
+                        col_inicio += 3
 
                 return output.getvalue()
