@@ -30,7 +30,6 @@ def detectar_empresa(nome):
     return 'OUTROS'
 
 def normalizar_chave_manual(chave):
-    """Converte qualquer variação para o padrão do sistema"""
     c = str(chave).upper().strip()
     if 'NOVOS' in c: return 'NOVOS PAGOS'
     if 'USADOS' in c: return 'USADOS PAGOS'
@@ -60,13 +59,64 @@ def normalizar_tipo(titulo):
     return 'OUTROS'
 
 ITENS = [
-    ('CARTEIRA', 'CARTEIRA'),  ('MERCADO.PAGO', 'MERCADO.PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
+    ('CARTEIRA', 'CARTEIRA'), ('MERCADO.PAGO', 'MERCADO.PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
     ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
     ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),
     ('TRANSITORIA', 'TRANSITORIA'), ('ADIANTAMENTO', 'ADIANTAMENTOS'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
+
+# ================= FUNCAO DO EXCEL - PRECISA ESTAR AQUI EM CIMA =================
+def gerar_excel(df_para_exportar, empresas_selecionadas):
+    output = BytesIO()
+    data_hoje = date.today().strftime('%d/%m/%Y')
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        workbook = writer.book
+        worksheet = workbook.create_sheet('POSICAO DIARIA')
+        writer.sheets['POSICAO DIARIA'] = worksheet
+        from openpyxl.styles import Font, Alignment, Border, Side
+        border_fina = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+        bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
+        
+        linha_atual = 1
+        worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
+        cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
+        worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
+        
+        linha_atual += 1
+        empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
+        for emp in empresas_ordem:
+            if emp not in empresas_selecionadas: col_inicio += 3; continue
+            
+            linha_temp = linha_atual
+            worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
+            worksheet.cell(row=linha_temp, column=col_inicio, value=emp).font = bold; worksheet.cell(row=linha_temp, column=col_inicio).alignment = center
+            
+            linha_temp += 1; total_geral = 0.0; valores_por_item = {}
+            for item_chave, item_nome in ITENS:
+                total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                if item_chave == 'DIF_TRANS_ADIANT':
+                    trans_valor = valores_por_item.get('TRANSITORIA', 0); adiant_valor = valores_por_item.get('ADIANTAMENTO', 0)
+                    total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                valores_por_item[item_chave] = total
+                if item_chave == 'OBRIGACOES': total_geral -= total
+                else: total_geral += total
+                
+                worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
+                cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'
+                
+                worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
+                worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
+                
+                linha_temp += 1
+            
+            worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
+            cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
+            
+            col_inicio += 3
+
+    return output.getvalue()
 
 # ================= LEITURA DOS ARQUIVOS VIA UPLOAD =================
 uploaded_files = st.file_uploader(
@@ -77,7 +127,6 @@ uploaded_files = st.file_uploader(
 
 manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
 
-# Carrega valores_manuais.json - COM NORMALIZAÇÃO
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
@@ -86,7 +135,6 @@ valores_iniciais = {
 if manual_file is not None:
     try:
         dados = json.load(manual_file)
-        # NORMALIZA O JSON QUE VEIO DO ARQUIVO
         dados_norm = {}
         for emp, itens in dados.items():
             dados_norm[emp] = {}
@@ -99,7 +147,7 @@ if manual_file is not None:
 if uploaded_files:
     dfs = {file.name: pd.read_excel(file) for file in uploaded_files}
 
-    # ================= FUNCOES DE CARGA ADAPTADAS =================
+    #... aqui vão todas as suas 4 funções carregar_... [mantém igual]
     def carregar_posicao_analitica():
         if 'financeiro.xls' not in dfs and 'financeiro.xlsx' not in dfs: return pd.DataFrame()
         df_raw = dfs.get('financeiro.xls', dfs.get('financeiro.xlsx'))
@@ -204,7 +252,6 @@ if uploaded_files:
             df = pd.concat(lista_df, ignore_index=True)
             df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
 
-            # CALCULA O DIF_TRANS_ADIANT
             empresas = df['Empresa'].unique()
             novas_linhas = []
             for emp in empresas:
@@ -237,71 +284,6 @@ if uploaded_files:
             st.markdown("### Exportar")
             
             excel_data = gerar_excel(df, empresas_selecionadas)
-            st.download_button(
-                label="📥 Baixar Excel",
-                data=excel_data,
-                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-        def gerar_excel(df_para_exportar, empresas_selecionadas):
-            output = BytesIO()
-            data_hoje = date.today().strftime('%d/%m/%Y')
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                workbook = writer.book
-                worksheet = workbook.create_sheet('POSICAO DIARIA')
-                writer.sheets['POSICAO DIARIA'] = worksheet
-                from openpyxl.styles import Font, Alignment, Border, Side
-                border_fina = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-                bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
-                
-                linha_atual = 1
-                worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
-                cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
-                worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
-                
-                linha_atual += 1
-                empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
-                for emp in empresas_ordem:
-                    if emp not in empresas_selecionadas: col_inicio += 3; continue
-                    
-                    linha_temp = linha_atual
-                    worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
-                    worksheet.cell(row=linha_temp, column=col_inicio, value=emp).font = bold; worksheet.cell(row=linha_temp, column=col_inicio).alignment = center
-                    
-                    linha_temp += 1; total_geral = 0.0; valores_por_item = {}
-                    for item_chave, item_nome in ITENS:
-                        total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                        if item_chave == 'DIF_TRANS_ADIANT':
-                            trans_valor = valores_por_item.get('TRANSITORIA', 0); adiant_valor = valores_por_item.get('ADIANTAMENTO', 0)
-                            total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
-                        valores_por_item[item_chave] = total
-                        if item_chave == 'OBRIGACOES': total_geral -= total
-                        else: total_geral += total
-                        
-                        worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
-                        cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'
-                        
-                        worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
-                        worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
-                        
-                        linha_temp += 1
-                    
-                    worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
-                    cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
-                    
-                    col_inicio += 3
-        
-            return output.getvalue()
-        
-        
-        with st.sidebar:
-            st.markdown("### Filtros")
-            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
-            st.divider()
-            st.markdown("### Exportar")
-            
-            excel_data = gerar_excel(df, empresas_selecionadas) # <- AGORA CHAMA DEPOIS
             st.download_button(
                 label="📥 Baixar Excel",
                 data=excel_data,
