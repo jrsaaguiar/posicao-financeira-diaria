@@ -216,24 +216,24 @@ if uploaded_files:
                 if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
         return pd.DataFrame(dados)
 
-    # ================= TELA DE LANCAMENTO MANUAL - NOVO LAYOUT =================
-    st.markdown("#### Lançamento Manual")
-    col_m, col_ws, col_e = st.columns(3)
-    valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-
-    empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
+    # ================= TELA DE LANCAMENTO MANUAL =================
+    with st.expander("📝 Lançamento Manual - Clique para abrir", expanded=False):
+        col_m, col_ws, col_e = st.columns(3)
+        valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
     
-    for emp, col in empresas_col.items():
-        with col:
-            st.markdown(f"**{emp}**")
-            for item_chave, item_nome in ITENS_MANUAIS:
-                st.markdown(f"{item_nome}")
-                valores_digitados[emp][item_chave] = st.text_input(
-                    label="", 
-                    value=valores_iniciais[emp][item_chave], 
-                    key=f"{emp}_{item_chave}", 
-                    label_visibility="collapsed"
-                )
+        empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
+        
+        for emp, col in empresas_col.items():
+            with col:
+                st.markdown(f"**{emp}**")
+                for item_chave, item_nome in ITENS_MANUAIS:
+                    st.markdown(f"{item_nome}")
+                    valores_digitados[emp][item_chave] = st.text_input(
+                        label="", 
+                        value=valores_iniciais[emp][item_chave], 
+                        key=f"{emp}_{item_chave}", 
+                        label_visibility="collapsed"
+                    )
 
     if st.button("💾 Carregar Dados e Calcular"):
         lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados)]
@@ -296,8 +296,14 @@ if uploaded_files:
                 
                 dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
                 df_mostrar = pd.DataFrame(dados_tabela)
-                
-                st.dataframe(df_mostrar, hide_index=True, use_container_width=True, column_config={
-                    "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
-                    "VALORES": st.column_config.TextColumn("VALORES")
-                })
+                #----------
+                st.dataframe(
+                    df_mostrar, 
+                    hide_index=True, 
+                    use_container_width=True, 
+                    height=650, # <- ADICIONA ESSA LINHA
+                    column_config={
+                        "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
+                        "VALORES": st.column_config.TextColumn("VALORES")
+                    }
+                )
