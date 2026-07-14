@@ -30,6 +30,7 @@ def detectar_empresa(nome):
 
 def normalizar_chave_manual(chave):
     c = str(chave).upper().strip()
+    if 'NOVOS' in c and 'FUNDAO' in c: return 'FUNDAO NOVOS' # NOVO
     if 'NOVOS' in c: return 'NOVOS PAGOS'
     if 'USADOS' in c: return 'USADOS PAGOS'
     if 'HB' in c or 'H.B' in c: return 'H.B.PECAS'
@@ -66,8 +67,8 @@ ITENS = [
     ('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
 
-ITENS_MANUAIS = [
-    ('NOVOS PAGOS', 'NOVOS PAGOS'), ('USADOS PAGOS', 'USADOS PAGOS'),
+ITENS_MANUAIS = [ # CORRECAO: ADICIONADO FUNDAO NOVOS
+    ('NOVOS PAGOS', 'NOVOS PAGOS'), ('USADOS PAGOS', 'USADOS PAGOS'),('FUNDAO NOVOS', 'FUNDAO NOVOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
 ]
 
@@ -134,7 +135,7 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
 
                 if item_chave == 'OBRIGACOES':
                     total_geral -= total
-                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: # CORRECAO 3
+                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
                     total_geral += total
 
             worksheet.cell(row=linha_dados, column=col_inicio, value='TOTAL').font = bold; worksheet.cell(row=linha_dados, column=col_inicio).border = border_fina
@@ -152,10 +153,10 @@ with st.sidebar:
 manual_file = st.file_uploader("📄 valores_manuais.json", type=['json'])
 uploaded_files = st.file_uploader("📁 Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 
-valores_iniciais = {
-    'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
-    'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
-    'EUSEBIO': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
+valores_iniciais = { # CORRECAO: ADICIONADO FUNDAO NOVOS
+    'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
+    'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
+    'EUSEBIO': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
 }
 if manual_file is not None:
     try:
@@ -298,7 +299,7 @@ if uploaded_files:
 
                     if item_chave == 'OBRIGACOES':
                         total_geral -= total
-                    elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: # CORRECAO 3
+                    elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
                         total_geral += total
 
                     dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
