@@ -9,7 +9,7 @@ from openpyxl.utils import get_column_letter
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
 
-# ================= FUNCOES AUXILIARES =================
+# ================= FUNCOES AUXILIARES ==================
 def formatar_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
