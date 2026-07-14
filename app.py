@@ -9,7 +9,6 @@ from openpyxl.utils import get_column_letter
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
 
-# ================= FUNCOES AUXILIARES ==================
 def formatar_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
@@ -72,7 +71,6 @@ ITENS_MANUAIS = [
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
 ]
 
-# ================= FUNCAO DO EXCEL =================
 def gerar_excel(df_para_exportar, empresas_selecionadas):
     output = BytesIO()
     data_hoje = date.today().strftime('%d/%m/%Y')
@@ -112,12 +110,11 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
             col_inicio = 1
             for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
                 if emp not in empresas_selecionadas: col_inicio += 3; continue
-
                 total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0 # CORRECAO 1
+                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
 
                 cell_desc = worksheet.cell(row=linha_dados, column=col_inicio, value=item_nome); cell_desc.border = border_fina
                 cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'; cell_valor.border = border_fina
@@ -133,9 +130,12 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0 # CORRECAO 1
-                if item_chave == 'OBRIGACOES': total_geral -= total
-                else: total_geral += total
+                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
+
+                if item_chave == 'OBRIGACOES':
+                    total_geral -= total
+                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: # CORRECAO 3
+                    total_geral += total
 
             worksheet.cell(row=linha_dados, column=col_inicio, value='TOTAL').font = bold; worksheet.cell(row=linha_dados, column=col_inicio).border = border_fina
             cell_total = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'; cell_total.border = border_fina
@@ -143,14 +143,12 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
 
     return output.getvalue()
 
-# ================= SIDEBAR: FILTROS + EXPORTAR =================
 with st.sidebar:
     st.markdown("### Filtros")
     empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
     st.divider()
     st.markdown("### Exportar")
 
-# ================= CORPO: UPLOAD + LANCAMENTO =================
 manual_file = st.file_uploader("📄 valores_manuais.json", type=['json'])
 uploaded_files = st.file_uploader("📁 Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 
@@ -242,11 +240,9 @@ if uploaded_files:
                 if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
         return pd.DataFrame(dados)
 
-    # ================= LANCAMENTO MANUAL EM EXPANDER =================
     with st.expander("📝 Lançamento Manual - Clique para abrir", expanded=True):
         col_m, col_ws, col_e = st.columns(3)
         valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-
         empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
 
         for emp, col in empresas_col.items():
@@ -254,21 +250,10 @@ if uploaded_files:
                 st.markdown(f"**{emp}**")
                 for item_chave, item_nome in ITENS_MANUAIS:
                     st.markdown(f"{item_nome}")
-                    valores_digitados[emp][item_chave] = st.text_input(
-                        label="",
-                        value=valores_iniciais[emp][item_chave],
-                        key=f"{emp}_{item_chave}",
-                        label_visibility="collapsed"
-                    )
+                    valores_digitados[emp][item_chave] = st.text_input(label="", value=valores_iniciais[emp][item_chave], key=f"{emp}_{item_chave}", label_visibility="collapsed")
 
-        # CORRECAO 2: BOTAO PARA SALVAR O JSON
         json_para_salvar = json.dumps(valores_digitados, indent=4, ensure_ascii=False)
-        st.download_button(
-            label="💾 Salvar valores_manuais.json",
-            data=json_para_salvar,
-            file_name="valores_manuais.json",
-            mime="application/json"
-        )
+        st.download_button(label="💾 Salvar valores_manuais.json", data=json_para_salvar, file_name="valores_manuais.json", mime="application/json")
 
     if st.button("💾 Carregar Dados e Calcular"):
         lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados)]
@@ -276,27 +261,22 @@ if uploaded_files:
         if lista_df:
             df = pd.concat(lista_df, ignore_index=True)
             df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
-
             empresas = df['Empresa'].unique()
             novas_linhas = []
             for emp in empresas:
                 trans = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'TRANSITORIA')]['Saldo'].sum()
                 adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTO')]['Saldo'].sum()
-                if trans > 0: # CORRECAO 1
+                if trans > 0:
                     dif = adiant - trans
                     if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif})
             if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-
             st.session_state['df_final'] = df
-            st.session_state['valores_digitados_salvar'] = valores_digitados # guarda pra salvar depois
             st.success("Dados carregados!")
         else:
             st.error("Não consegui ler os dados dos arquivos")
 
-    # ================= 3 TABELAS LADO A LADO =================
     if 'df_final' in st.session_state:
         df = st.session_state['df_final']
-
         with st.sidebar:
             excel_data = gerar_excel(df, empresas_selecionadas)
             st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
@@ -306,25 +286,25 @@ if uploaded_files:
 
         for emp, col in empresas_cols.items():
             if emp not in empresas_selecionadas: continue
-
             with col:
                 dados_tabela = []
                 total_geral = 0.0
-
                 for item_chave, item_nome in ITENS:
                     total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
                     if item_chave == 'DIF_TRANS_ADIANT':
                         trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
                         adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
-                        total = adiant_valor - trans_valor if trans_valor > 0 else 0.0 # CORRECAO 1
+                        total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
 
-                    if item_chave == 'OBRIGACOES': total_geral -= total
-                    else: total_geral += total
+                    if item_chave == 'OBRIGACOES':
+                        total_geral -= total
+                    elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: # CORRECAO 3
+                        total_geral += total
+
                     dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
 
                 dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
                 df_mostrar = pd.DataFrame(dados_tabela)
-
                 st.dataframe(df_mostrar, hide_index=True, use_container_width=True, height=680, column_config={
                     "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
                     "VALORES": st.column_config.TextColumn("VALORES")
