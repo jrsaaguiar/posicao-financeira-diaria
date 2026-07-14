@@ -29,6 +29,16 @@ def detectar_empresa(nome):
     if 'EUSEBIO' in nome: return 'EUSEBIO'
     return 'OUTROS'
 
+def normalizar_chave_manual(chave):
+    """Converte qualquer variação para o padrão do sistema"""
+    c = str(chave).upper().strip()
+    if 'NOVOS' in c: return 'NOVOS PAGOS'
+    if 'USADOS' in c: return 'USADOS PAGOS'
+    if 'HB' in c or 'H.B' in c: return 'H.B.PECAS'
+    if 'FIDIC' in c: return 'FIDIC'
+    if 'ESTOQUE' in c or 'EST.PECAS' in c: return 'ESTOQUE PECAS'
+    return chave
+
 def normalizar_tipo(titulo):
     t = str(titulo).upper().strip()
     if 'CARTEIRA' in t: return 'CARTEIRA'
@@ -67,7 +77,7 @@ uploaded_files = st.file_uploader(
 
 manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
 
-# Carrega valores_manuais.json - 100% PADRONIZADO
+# Carrega valores_manuais.json - COM NORMALIZAÇÃO
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
@@ -76,7 +86,14 @@ valores_iniciais = {
 if manual_file is not None:
     try:
         dados = json.load(manual_file)
-        valores_iniciais.update(dados)
+        # NORMALIZA O JSON QUE VEIO DO ARQUIVO
+        dados_norm = {}
+        for emp, itens in dados.items():
+            dados_norm[emp] = {}
+            for chave, valor in itens.items():
+                chave_norm = normalizar_chave_manual(chave)
+                dados_norm[emp][chave_norm] = valor
+        valores_iniciais.update(dados_norm)
     except: pass
 
 if uploaded_files:
