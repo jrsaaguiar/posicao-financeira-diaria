@@ -67,7 +67,7 @@ uploaded_files = st.file_uploader(
 
 manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
 
-# Carrega valores_manuais.json - CORRIGIDO
+# Carrega valores_manuais.json - 100% PADRONIZADO
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
@@ -227,52 +227,52 @@ if uploaded_files:
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
-            def gerar_excel(df_para_exportar, empresas_selecionadas):
-                output = BytesIO()
-                data_hoje = date.today().strftime('%d/%m/%Y')
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                    workbook = writer.book
-                    worksheet = workbook.create_sheet('POSICAO DIARIA')
-                    writer.sheets['POSICAO DIARIA'] = worksheet
-                    from openpyxl.styles import Font, Alignment, Border, Side
-                    border_fina = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-                    bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
+        def gerar_excel(df_para_exportar, empresas_selecionadas):
+            output = BytesIO()
+            data_hoje = date.today().strftime('%d/%m/%Y')
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                workbook = writer.book
+                worksheet = workbook.create_sheet('POSICAO DIARIA')
+                writer.sheets['POSICAO DIARIA'] = worksheet
+                from openpyxl.styles import Font, Alignment, Border, Side
+                border_fina = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+                bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
+                
+                linha_atual = 1
+                worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
+                cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
+                worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
+                
+                linha_atual += 1
+                empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
+                for emp in empresas_ordem:
+                    if emp not in empresas_selecionadas: col_inicio += 3; continue
                     
-                    linha_atual = 1
-                    worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
-                    cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
-                    worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
+                    linha_temp = linha_atual
+                    worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
+                    worksheet.cell(row=linha_temp, column=col_inicio, value=emp).font = bold; worksheet.cell(row=linha_temp, column=col_inicio).alignment = center
                     
-                    linha_atual += 1
-                    empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
-                    for emp in empresas_ordem:
-                        if emp not in empresas_selecionadas: col_inicio += 3; continue
+                    linha_temp += 1; total_geral = 0.0; valores_por_item = {}
+                    for item_chave, item_nome in ITENS:
+                        total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                        if item_chave == 'DIF_TRANS_ADIANT':
+                            trans_valor = valores_por_item.get('TRANSITORIA', 0); adiant_valor = valores_por_item.get('ADIANTAMENTO', 0)
+                            total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                        valores_por_item[item_chave] = total
+                        if item_chave == 'OBRIGACOES': total_geral -= total
+                        else: total_geral += total
                         
-                        linha_temp = linha_atual
-                        worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
-                        worksheet.cell(row=linha_temp, column=col_inicio, value=emp).font = bold; worksheet.cell(row=linha_temp, column=col_inicio).alignment = center
+                        worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
+                        cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'
                         
-                        linha_temp += 1; total_geral = 0.0; valores_por_item = {}
-                        for item_chave, item_nome in ITENS:
-                            total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                            if item_chave == 'DIF_TRANS_ADIANT':
-                                trans_valor = valores_por_item.get('TRANSITORIA', 0); adiant_valor = valores_por_item.get('ADIANTAMENTO', 0)
-                                total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
-                            valores_por_item[item_chave] = total
-                            if item_chave == 'OBRIGACOES': total_geral -= total
-                            else: total_geral += total
-                            
-                            worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
-                            cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'
-                            
-                            worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
-                            worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
-                            
-                            linha_temp += 1
+                        worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
+                        worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
                         
-                        worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
-                        cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
-                        
-                        col_inicio += 3
+                        linha_temp += 1
+                    
+                    worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
+                    cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
+                    
+                    col_inicio += 3
 
-                return output.getvalue()
+            return output.getvalue()
