@@ -30,7 +30,7 @@ def detectar_empresa(nome):
 
 def normalizar_chave_manual(chave):
     c = str(chave).upper().strip()
-    if 'NOVOS' in c and 'FUNDAO' in c: return 'FUNDAO NOVOS' # NOVO
+    if 'NOVOS' in c and 'FUNDAO' in c: return 'FUNDAO NOVOS'
     if 'NOVOS' in c: return 'NOVOS PAGOS'
     if 'USADOS' in c: return 'USADOS PAGOS'
     if 'HB' in c or 'H.B' in c: return 'H.B.PECAS'
@@ -67,7 +67,7 @@ ITENS = [
     ('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
 
-ITENS_MANUAIS = [ # CORRECAO: ADICIONADO FUNDAO NOVOS
+ITENS_MANUAIS = [
     ('NOVOS PAGOS', 'NOVOS PAGOS'), ('USADOS PAGOS', 'USADOS PAGOS'),('FUNDAO NOVOS', 'FUNDAO NOVOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
 ]
@@ -153,7 +153,7 @@ with st.sidebar:
 manual_file = st.file_uploader("📄 valores_manuais.json", type=['json'])
 uploaded_files = st.file_uploader("📁 Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 
-valores_iniciais = { # CORRECAO: ADICIONADO FUNDAO NOVOS
+valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'EUSEBIO': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'FUNDAO NOVOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
@@ -169,6 +169,11 @@ if manual_file is not None:
                 dados_norm[emp][chave_norm] = valor
         valores_iniciais.update(dados_norm)
     except: pass
+
+# CORRECAO DO KEYERROR: garante que FUNDAO NOVOS existe
+for emp in valores_iniciais:
+    if 'FUNDAO NOVOS' not in valores_iniciais[emp]:
+        valores_iniciais[emp]['FUNDAO NOVOS'] = '0,00'
 
 if uploaded_files:
     dfs = {file.name: pd.read_excel(file) for file in uploaded_files}
