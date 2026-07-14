@@ -124,9 +124,16 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
 
     return output.getvalue()
 
-# ================= LEITURA DOS ARQUIVOS VIA UPLOAD =================
-uploaded_files = st.file_uploader("Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
-manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
+# ================= SIDEBAR: FILTROS + EXPORTAR =================
+with st.sidebar:
+    st.markdown("### Filtros")
+    empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
+    st.divider()
+    st.markdown("### Exportar")
+
+# ================= CORPO: UPLOAD + LANCAMENTO =================
+manual_file = st.file_uploader("📄 valores_manuais.json", type=['json'])
+uploaded_files = st.file_uploader("📁 Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
@@ -216,11 +223,11 @@ if uploaded_files:
                 if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
         return pd.DataFrame(dados)
 
-    # ================= TELA DE LANCAMENTO MANUAL =================
-    with st.expander("📝 Lançamento Manual - Clique para abrir", expanded=False):
+    # ================= LANCAMENTO MANUAL EM EXPANDER =================
+    with st.expander("📝 Lançamento Manual - Clique para abrir", expanded=True):
         col_m, col_ws, col_e = st.columns(3)
         valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-    
+
         empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
         
         for emp, col in empresas_col.items():
@@ -261,16 +268,11 @@ if uploaded_files:
     if 'df_final' in st.session_state:
         df = st.session_state['df_final']
 
-        # 1. FILTROS + EXPORTAR
+        # BOTAO EXPORTAR VAI PRA SIDEBAR DEPOIS DE CARREGAR
         with st.sidebar:
-            st.markdown("### Filtros")
-            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
-            st.divider()
-            st.markdown("### Exportar")
             excel_data = gerar_excel(df, empresas_selecionadas)
             st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        # 2. MONTAR 3 DATAFRAMES LADO A LADO
         col1, col2, col3 = st.columns(3)
         empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
         
@@ -296,14 +298,8 @@ if uploaded_files:
                 
                 dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
                 df_mostrar = pd.DataFrame(dados_tabela)
-                #----------
-                st.dataframe(
-                    df_mostrar, 
-                    hide_index=True, 
-                    use_container_width=True, 
-                    height=650, # <- ADICIONA ESSA LINHA
-                    column_config={
-                        "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
-                        "VALORES": st.column_config.TextColumn("VALORES")
-                    }
-                )
+                
+                st.dataframe(df_mostrar, hide_index=True, use_container_width=True, height=680, column_config={
+                    "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
+                    "VALORES": st.column_config.TextColumn("VALORES")
+                })
