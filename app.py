@@ -70,7 +70,7 @@ manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['j
 # Carrega valores_manuais.json
 valores_iniciais = {
     'MATRIZ': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H/B PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
-    'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H/B PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
+    'WS': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H.B.PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'},
     'EUSEBIO': {'NOVOS PAGOS': '0,00', 'USADOS PAGOS': '0,00', 'H/B PECAS': '0,00', 'FIDIC': '0,00', 'ESTOQUE PECAS': '0,00'}
 }
 if manual_file is not None:
