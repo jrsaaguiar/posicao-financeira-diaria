@@ -40,7 +40,7 @@ def normalizar_tipo(titulo):
     if 'NOVOS PAGOS' in t or 'NOVOS.PAGOS' in t: return 'NOVOS PAGOS'
     if 'USADOS PAGOS' in t or 'USADOS.PAGOS' in t or 'USADOS' in t: return 'USADOS PAGOS'
     if 'FIDIC' in t: return 'FIDIC'
-    if 'H.B.PECAS' in t or 'H/B PECAS' in t or 'PECAS' in t: return 'H/B PECAS'
+    if 'H.B.PECAS' in t or 'H.B.PECAS' in t or 'PECAS' in t: return 'H.B.PECAS'
     if 'ESTOQUE PECAS' in t or 'EST.PECAS' in t: return 'ESTOQUE PECAS'
     if 'OBRIG' in t: return 'OBRIGACOES'
     if 'TRANSITORIA' in t: return 'TRANSITORIA'
@@ -52,7 +52,7 @@ ITENS = [
     ('CARTEIRA', 'CARTEIRA'), ('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
     ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
-    ('H/B PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
+    ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
     ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),
     ('TRANSITORIA', 'TRANSITORIA'), ('ADIANTAMENTO', 'ADIANTAMENTOS'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
@@ -159,7 +159,7 @@ if uploaded_files:
         st.markdown("**MATRIZ**")
         valores_digitados['MATRIZ']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['MATRIZ']['NOVOS PAGOS'], key="m_novos_pagos")
         valores_digitados['MATRIZ']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['MATRIZ']['USADOS PAGOS'], key="m_usados_pagos")
-        valores_digitados['MATRIZ']['H/B PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['MATRIZ']['H/B PECAS'], key="m_hb_pecas")
+        valores_digitados['MATRIZ']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['MATRIZ']['H.B.PECAS'], key="m_hb_pecas")
         valores_digitados['MATRIZ']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['MATRIZ']['FIDIC'], key="m_fidic")
         valores_digitados['MATRIZ']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['MATRIZ']['ESTOQUE PECAS'], key="m_est_pecas")
 
@@ -167,7 +167,7 @@ if uploaded_files:
         st.markdown("**WS**")
         valores_digitados['WS']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['WS']['NOVOS PAGOS'], key="ws_novos_pagos")
         valores_digitados['WS']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['WS']['USADOS PAGOS'], key="ws_usados_pagos")
-        valores_digitados['WS']['H/B PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['WS']['H/B PECAS'], key="ws_hb_pecas")
+        valores_digitados['WS']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['WS']['H.B.PECAS'], key="ws_hb_pecas")
         valores_digitados['WS']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['WS']['FIDIC'], key="ws_fidic")
         valores_digitados['WS']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['WS']['ESTOQUE PECAS'], key="ws_est_pecas")
 
@@ -175,7 +175,7 @@ if uploaded_files:
         st.markdown("**EUSEBIO**")
         valores_digitados['EUSEBIO']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['EUSEBIO']['NOVOS PAGOS'], key="eus_novos_pagos")
         valores_digitados['EUSEBIO']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['EUSEBIO']['USADOS PAGOS'], key="eus_usados_pagos")
-        valores_digitados['EUSEBIO']['H/B PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['EUSEBIO']['H/B PECAS'], key="eus_hb_pecas")
+        valores_digitados['EUSEBIO']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['EUSEBIO']['H.B.PECAS'], key="eus_hb_pecas")
         valores_digitados['EUSEBIO']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['EUSEBIO']['FIDIC'], key="eus_fidic")
         valores_digitados['EUSEBIO']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['EUSEBIO']['ESTOQUE PECAS'], key="eus_est_pecas")
 
