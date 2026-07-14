@@ -178,10 +178,10 @@ if manual_file is not None:
 
 if uploaded_files:
     dfs = {file.name: pd.read_excel(file) for file in uploaded_files}
-
+    # ======= CARREGA POSICAO ANALITICA =====
     def carregar_posicao_analitica():
-        if 'financeiro.xls' not in dfs and 'financeiro.xlsx' not in dfs: return pd.DataFrame()
-        df_raw = dfs.get('financeiro.xls', dfs.get('financeiro.xlsx'))
+        if 'RFN003_PosicaoAnaliticoReceber_Excel.xls' not in dfs and 'RFN003_PosicaoAnaliticoReceber_Excel.xlsx' not in dfs: return pd.DataFrame()
+        df_raw = dfs.get('RFN003_PosicaoAnaliticoReceber_Excel.xls', dfs.get('RFN003_PosicaoAnaliticoReceber_Excel.xlsx'))
         df_raw.columns = df_raw.columns.str.strip()
         dados = []
         for empresa in df_raw['Empresa'].dropna().unique():
