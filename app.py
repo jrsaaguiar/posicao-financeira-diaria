@@ -270,13 +270,42 @@ if uploaded_files:
     # ================= TABELA + DOWNLOAD =================
     if 'df_final' in st.session_state:
         df = st.session_state['df_final']
-
+    
         st.markdown("### POSIÇÃO FINANCEIRA DIÁRIA")
         c1, c2, c3 = st.columns([3, 1, 1])
         with c2: st.markdown("**DATA**")
         with c3: st.markdown(f"**{date.today().strftime('%d/%m/%Y')}**")
         st.divider()
-
+    
+        # AQUI: MONTA A TABELA PARA VISUALIZAR NA TELA
+        empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']
+        for emp in empresas_ordem:
+            if emp not in empresas_selecionadas: continue
+            
+            st.markdown(f"#### {emp}")
+            valores_emp = {}
+            total_geral = 0.0
+            
+            for item_chave, item_nome in ITENS:
+                total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
+                
+                # Recalcula DIF_TRANS_ADIANT na hora de mostrar
+                if item_chave == 'DIF_TRANS_ADIANT':
+                    trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
+                    adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
+                    total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
+                
+                valores_emp[item_chave] = total
+                if item_chave == 'OBRIGACOES': total_geral -= total
+                else: total_geral += total
+                
+                col1, col2 = st.columns([3,1])
+                with col1: st.write(item_nome)
+                with col2: st.write(formatar_br(total))
+            
+            st.markdown(f"**TOTAL {emp}: {formatar_br(total_geral)}**")
+            st.divider()
+    
         with st.sidebar:
             st.markdown("### Filtros")
             empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
