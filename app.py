@@ -121,7 +121,7 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                    total = adiant_valor - trans_valor # AQUI DEVE FICAR POSITIVO
+                    total = adiant_valor - trans_valor  # <- INVERTIDO
 
                 cell_desc = worksheet.cell(row=linha_dados, column=col_inicio, value=item_nome); cell_desc.border = border_fina
                 cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'; cell_valor.border = border_fina
@@ -279,7 +279,7 @@ if uploaded_files:
                 trans = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'TRANSITORIA')]['Saldo'].sum()
                 adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTO')]['Saldo'].sum()
                 if trans > 0:
-                    dif = trans - adiant
+                    dif = adiant - trans
                     if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif})
             if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
 
