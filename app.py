@@ -53,8 +53,8 @@ def normalizar_tipo(titulo):
     if 'H.B.PECAS' in t or 'HB PECAS' in t or 'PECAS' in t: return 'H.B.PECAS'
     if 'ESTOQUE PECAS' in t or 'EST.PECAS' in t: return 'ESTOQUE PECAS'
     if 'OBRIG' in t: return 'OBRIGACOES'
-    if 'TRANSITORIA' in t: return 'TRANSITORIA'
     if 'ADIANTAMENTO' in t: return 'ADIANTAMENTO'
+    if 'TRANSITORIA' in t: return 'TRANSITORIA'
     if 'DIF_TRANS_ADIANT' in t: return 'DIF_TRANS_ADIANT'
     return 'OUTROS'
 
@@ -63,8 +63,8 @@ ITENS = [
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
     ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
-    ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),
-    ('TRANSITORIA', 'TRANSITORIA'), ('ADIANTAMENTO', 'ADIANTAMENTOS'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
+    ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),('ADIANTAMENTO', 'ADIANTAMENTOS'),
+    ('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
 
 ITENS_MANUAIS = [
