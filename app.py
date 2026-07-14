@@ -216,7 +216,7 @@ if uploaded_files:
                 if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
         return pd.DataFrame(dados)
 
-    # ================= TELA DE LANCAMENTO MANUAL =================
+    # ================= TELA DE LANCAMENTO MANUAL ==================
     st.markdown("#### Lançamento Manual")
     col_m, col_ws, col_e = st.columns(3)
     valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
