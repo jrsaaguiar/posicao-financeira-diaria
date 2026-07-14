@@ -72,7 +72,7 @@ ITENS_MANUAIS = [
     ('NOVOS PAGOS', 'NOVOS.PAGOS'), ('USADOS PAGOS', 'USADOS.PAGOS'),('FUNDAO NOVOS', 'FUNDAO.NOVOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
 ]
-ITENS_COM_QTD = ['NOVOS PAGOS', 'USADOS PAGOS', 'FUNDAO NOVOS'] # <- só esses tem qtd
+ITENS_COM_QTD = ['NOVOS PAGOS', 'USADOS PAGOS'] # <- só esses tem qtd
 
 def gerar_excel(df_para_exportar, empresas_selecionadas):
     output = BytesIO()
