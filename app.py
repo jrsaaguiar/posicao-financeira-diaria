@@ -291,5 +291,20 @@ if uploaded_files:
                     cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
                     
                     col_inicio += 3
-
+        
             return output.getvalue()
+        
+        
+        with st.sidebar:
+            st.markdown("### Filtros")
+            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
+            st.divider()
+            st.markdown("### Exportar")
+            
+            excel_data = gerar_excel(df, empresas_selecionadas) # <- AGORA CHAMA DEPOIS
+            st.download_button(
+                label="📥 Baixar Excel",
+                data=excel_data,
+                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
