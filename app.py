@@ -277,7 +277,14 @@ if uploaded_files:
         with c3: st.markdown(f"**{date.today().strftime('%d/%m/%Y')}**")
         st.divider()
     
-        # AQUI: MONTA A TABELA PARA VISUALIZAR NA TELA
+        # 1. PRIMEIRO CRIA OS FILTROS
+        with st.sidebar:
+            st.markdown("### Filtros")
+            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
+            st.divider()
+            st.markdown("### Exportar")
+    
+        # 2. DEPOIS MONTA A TABELA USANDO O FILTRO
         empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']
         for emp in empresas_ordem:
             if emp not in empresas_selecionadas: continue
@@ -289,7 +296,6 @@ if uploaded_files:
             for item_chave, item_nome in ITENS:
                 total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
                 
-                # Recalcula DIF_TRANS_ADIANT na hora de mostrar
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
@@ -306,12 +312,8 @@ if uploaded_files:
             st.markdown(f"**TOTAL {emp}: {formatar_br(total_geral)}**")
             st.divider()
     
+        # 3. POR ULTIMO O BOTAO DE DOWNLOAD
         with st.sidebar:
-            st.markdown("### Filtros")
-            empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
-            st.divider()
-            st.markdown("### Exportar")
-            
             excel_data = gerar_excel(df, empresas_selecionadas)
             st.download_button(
                 label="📥 Baixar Excel",
