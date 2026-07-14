@@ -67,6 +67,11 @@ ITENS = [
     ('TRANSITORIA', 'TRANSITORIA'), ('ADIANTAMENTO', 'ADIANTAMENTOS'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
 ]
 
+ITENS_MANUAIS = [
+    ('NOVOS PAGOS', 'NOVOS PAGOS'), ('USADOS PAGOS', 'USADOS PAGOS'),
+    ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'), ('ESTOQUE PECAS', 'EST.PECAS')
+]
+
 # ================= FUNCAO DO EXCEL =================
 def gerar_excel(df_para_exportar, empresas_selecionadas):
     output = BytesIO()
@@ -211,34 +216,24 @@ if uploaded_files:
                 if valor > 0: dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor})
         return pd.DataFrame(dados)
 
-    # ================= TELA DE LANCAMENTO MANUAL =================
+    # ================= TELA DE LANCAMENTO MANUAL - NOVO LAYOUT =================
     st.markdown("#### Lançamento Manual")
     col_m, col_ws, col_e = st.columns(3)
     valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
 
-    with col_m:
-        st.markdown("**MATRIZ**")
-        valores_digitados['MATRIZ']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['MATRIZ']['NOVOS PAGOS'], key="m_novos_pagos")
-        valores_digitados['MATRIZ']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['MATRIZ']['USADOS PAGOS'], key="m_usados_pagos")
-        valores_digitados['MATRIZ']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['MATRIZ']['H.B.PECAS'], key="m_hb_pecas")
-        valores_digitados['MATRIZ']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['MATRIZ']['FIDIC'], key="m_fidic")
-        valores_digitados['MATRIZ']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['MATRIZ']['ESTOQUE PECAS'], key="m_est_pecas")
-
-    with col_ws:
-        st.markdown("**WS**")
-        valores_digitados['WS']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['WS']['NOVOS PAGOS'], key="ws_novos_pagos")
-        valores_digitados['WS']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['WS']['USADOS PAGOS'], key="ws_usados_pagos")
-        valores_digitados['WS']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['WS']['H.B.PECAS'], key="ws_hb_pecas")
-        valores_digitados['WS']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['WS']['FIDIC'], key="ws_fidic")
-        valores_digitados['WS']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['WS']['ESTOQUE PECAS'], key="ws_est_pecas")
-
-    with col_e:
-        st.markdown("**EUSEBIO**")
-        valores_digitados['EUSEBIO']['NOVOS PAGOS'] = st.text_input("NOVOS PAGOS", valores_iniciais['EUSEBIO']['NOVOS PAGOS'], key="eus_novos_pagos")
-        valores_digitados['EUSEBIO']['USADOS PAGOS'] = st.text_input("USADOS PAGOS", valores_iniciais['EUSEBIO']['USADOS PAGOS'], key="eus_usados_pagos")
-        valores_digitados['EUSEBIO']['H.B.PECAS'] = st.text_input("H.B.PECAS", valores_iniciais['EUSEBIO']['H.B.PECAS'], key="eus_hb_pecas")
-        valores_digitados['EUSEBIO']['FIDIC'] = st.text_input("FIDIC", valores_iniciais['EUSEBIO']['FIDIC'], key="eus_fidic")
-        valores_digitados['EUSEBIO']['ESTOQUE PECAS'] = st.text_input("EST.PECAS", valores_iniciais['EUSEBIO']['ESTOQUE PECAS'], key="eus_est_pecas")
+    empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
+    
+    for emp, col in empresas_col.items():
+        with col:
+            st.markdown(f"**{emp}**")
+            for item_chave, item_nome in ITENS_MANUAIS:
+                st.markdown(f"{item_nome}")
+                valores_digitados[emp][item_chave] = st.text_input(
+                    label="", 
+                    value=valores_iniciais[emp][item_chave], 
+                    key=f"{emp}_{item_chave}", 
+                    label_visibility="collapsed"
+                )
 
     if st.button("💾 Carregar Dados e Calcular"):
         lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados)]
