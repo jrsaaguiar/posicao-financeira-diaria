@@ -138,7 +138,7 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
-                    total = trans_valor - adiant_valor
+                    total = adiant_valor - trans_valor
                 if item_chave == 'OBRIGACOES': total_geral -= total
                 else: total_geral += total
 
