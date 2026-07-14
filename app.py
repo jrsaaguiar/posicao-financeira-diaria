@@ -85,41 +85,65 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
         bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
         header_fill = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
 
-        linha_atual = 1
-        worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
-        cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
-        worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
+        # LINHA 1: TITULO + DATA
+        worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=6) # TITULO pega 6 colunas
+        cell_titulo = worksheet.cell(row=1, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center; cell_titulo.border = border_fina
+        worksheet.cell(row=1, column=7, value='DATA').font = bold; worksheet.cell(row=1, column=7).alignment = center; worksheet.cell(row=1, column=7).border = border_fina
+        worksheet.cell(row=1, column=8, value=data_hoje).border = border_fina
 
-        linha_atual += 1
-        empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
-        for emp in empresas_ordem:
+        # LINHA 2: CABEÇALHO EMPRESAS
+        col_inicio = 1
+        for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
             if emp not in empresas_selecionadas: col_inicio += 3; continue
+            worksheet.merge_cells(start_row=2, start_column=col_inicio, end_row=2, end_column=col_inicio+1)
+            cell_emp = worksheet.cell(row=2, column=col_inicio, value=emp); cell_emp.font = bold; cell_emp.alignment = center; cell_emp.fill = header_fill; cell_emp.border = border_fina
+            worksheet.cell(row=2, column=col_inicio+1).fill = header_fill; worksheet.cell(row=2, column=col_inicio+1).border = border_fina
+            col_inicio += 3 # PULA 1 COLUNA DE SEPARACAO
 
-            linha_temp = linha_atual
-            worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
-            cell_emp = worksheet.cell(row=linha_temp, column=col_inicio, value=emp); cell_emp.font = bold; cell_emp.alignment = center; cell_emp.fill = header_fill
-            worksheet.cell(row=linha_temp, column=col_inicio+1).fill = header_fill
+        # LINHA 3: CABEÇALHO DESCRICAO VALORES
+        linha_temp = 3; col_inicio = 1
+        for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
+            if emp not in empresas_selecionadas: col_inicio += 3; continue
+            worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22  # DESCRICAO
+            worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18 # VALORES
+            worksheet.cell(row=linha_temp, column=col_inicio, value='DESCRICAO').font = bold; worksheet.cell(row=linha_temp, column=col_inicio).fill = header_fill; worksheet.cell(row=linha_temp, column=col_inicio).border = border_fina
+            worksheet.cell(row=linha_temp, column=col_inicio+1, value='VALORES').font = bold; worksheet.cell(row=linha_temp, column=col_inicio+1).fill = header_fill; worksheet.cell(row=linha_temp, column=col_inicio+1).border = border_fina
+            col_inicio += 3
 
-            linha_temp += 1
-            worksheet.cell(row=linha_temp, column=col_inicio, value='DESCRICAO').font = bold; worksheet.cell(row=linha_temp, column=col_inicio).fill = header_fill
-            worksheet.cell(row=linha_temp, column=col_inicio+1, value='VALORES').font = bold; worksheet.cell(row=linha_temp, column=col_inicio+1).fill = header_fill
+        # LINHAS DOS DADOS
+        linha_dados = 4
+        for item_chave, item_nome in ITENS:
+            col_inicio = 1
+            for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
+                if emp not in empresas_selecionadas: col_inicio += 3; continue
+                
+                total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                if item_chave == 'DIF_TRANS_ADIANT':
+                    trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                    adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                    total = trans_valor - adiant_valor # AQUI PODE FICAR NEGATIVO IGUAL MODELO
 
-            linha_temp += 1; total_geral = 0.0; valores_por_item = {}
+                cell_desc = worksheet.cell(row=linha_dados, column=col_inicio, value=item_nome); cell_desc.border = border_fina
+                cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'; cell_valor.border = border_fina
+                col_inicio += 3
+            linha_dados += 1
+
+        # LINHA TOTAL
+        col_inicio = 1
+        for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
+            if emp not in empresas_selecionadas: col_inicio += 3; continue
+            total_geral = 0.0
             for item_chave, item_nome in ITENS:
                 total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
                 if item_chave == 'DIF_TRANS_ADIANT':
-                    trans_valor = valores_por_item.get('TRANSITORIA', 0); adiant_valor = valores_por_item.get('ADIANTAMENTO', 0)
-                    total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
-                valores_por_item[item_chave] = total
+                    trans_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'TRANSITORIA') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                    adiant_valor = df_para_exportar[(df_para_exportar['Tipo de Título'] == 'ADIANTAMENTO') & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
+                    total = trans_valor - adiant_valor
                 if item_chave == 'OBRIGACOES': total_geral -= total
                 else: total_geral += total
 
-                worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
-                cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00'; cell_valor.border = border_fina
-                linha_temp += 1
-
-            worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
-            cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
+            worksheet.cell(row=linha_dados, column=col_inicio, value='TOTAL').font = bold; worksheet.cell(row=linha_dados, column=col_inicio).border = border_fina
+            cell_total = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'; cell_total.border = border_fina
             col_inicio += 3
 
     return output.getvalue()
