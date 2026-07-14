@@ -3,6 +3,8 @@ import pandas as pd
 import streamlit as st
 from datetime import date
 from io import BytesIO
+import openpyxl
+from openpyxl.utils import get_column_letter # <-- E ESSA
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
@@ -226,17 +228,22 @@ if uploaded_files:
                     from openpyxl.styles import Font, Alignment, Border, Side
                     border_fina = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
                     bold = Font(bold=True, size=11); center = Alignment(horizontal='center', vertical='center'); right = Alignment(horizontal='right', vertical='center')
+                    
                     linha_atual = 1
-                    worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=4)
-                    cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIARIA"); cell_titulo.font = Font(bold=True, size=12); cell_titulo.alignment = center
-                    worksheet.cell(row=linha_atual, column=5, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=6, value=data_hoje)
+                    # CORREÇÃO 1: Mesclar até coluna 8 agora
+                    worksheet.merge_cells(start_row=linha_atual, start_column=1, end_row=linha_atual, end_column=8)
+                    cell_titulo = worksheet.cell(row=linha_atual, column=1, value="POSIÇÃO FINANCEIRA DIÁRIA"); cell_titulo.font = Font(bold=True, size=14); cell_titulo.alignment = center
+                    worksheet.cell(row=linha_atual, column=9, value='DATA').font = bold; worksheet.cell(row=linha_atual, column=10, value=data_hoje)
+                    
                     linha_atual += 1
                     empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']; col_inicio = 1
                     for emp in empresas_ordem:
-                        if emp not in empresas_selecionadas: col_inicio += 2; continue
+                        if emp not in empresas_selecionadas: col_inicio += 3; continue # PULA 3 COLUNAS
+                        
                         linha_temp = linha_atual
                         worksheet.merge_cells(start_row=linha_temp, start_column=col_inicio, end_row=linha_temp, end_column=col_inicio+1)
                         worksheet.cell(row=linha_temp, column=col_inicio, value=emp).font = bold; worksheet.cell(row=linha_temp, column=col_inicio).alignment = center
+                        
                         linha_temp += 1; total_geral = 0.0; valores_por_item = {}
                         for item_chave, item_nome in ITENS:
                             total = df_para_exportar[(df_para_exportar['Tipo de Título'] == item_chave) & (df_para_exportar['Empresa'] == emp)]['Saldo'].sum()
@@ -246,42 +253,19 @@ if uploaded_files:
                             valores_por_item[item_chave] = total
                             if item_chave == 'OBRIGACOES': total_geral -= total
                             else: total_geral += total
+                            
                             worksheet.cell(row=linha_temp, column=col_inicio, value=item_nome).border = border_fina
-                            cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = '#,##0.00'
+                            cell_valor = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total); cell_valor.alignment = right; cell_valor.number_format = 'R$ #,##0.00' # Formato R$
+                            
+                            # CORREÇÃO 2: Aumentar largura da coluna
+                            worksheet.column_dimensions[get_column_letter(col_inicio)].width = 22
+                            worksheet.column_dimensions[get_column_letter(col_inicio+1)].width = 18
+                            
                             linha_temp += 1
+                        
                         worksheet.cell(row=linha_temp, column=col_inicio, value='TOTAL').font = bold
-                        cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = '#,##0.00'
-                        col_inicio += 2
+                        cell_total = worksheet.cell(row=linha_temp, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'
+                        
+                        col_inicio += 3 # CORREÇÃO 3: Pula 2 colunas + 1 vazia
+
                 return output.getvalue()
-
-            excel_data = gerar_excel(df, empresas_selecionadas)
-            st.download_button(
-                label="📊 Gerar Planilha Única",
-                data=excel_data,
-                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
-        # TABELA
-        cols = st.columns(3)
-        for nome_coluna, col in zip(['MATRIZ', 'WS', 'EUSEBIO'], cols):
-            if nome_coluna not in empresas_selecionadas: continue
-            with col:
-                st.markdown(f"<div style='text-align:center; border:2px solid #000; padding:8px; font-weight:bold; background:#f2f2f2'>{nome_coluna}</div>", unsafe_allow_html=True)
-                df_empresa = df[df['Empresa'] == nome_coluna] if not df.empty else pd.DataFrame()
-                html = "<table style='width:100%; border-collapse:collapse; font-size:13px; margin-top:10px'>"
-                html += "<tr><th style='border:1px solid #000; padding:4px; text-align:left; background:#e6e6e6'>DESCRICAO</th><th style='border:1px solid #000; padding:4px; text-align:right; background:#e6e6e6'>VALORES</th></tr>"
-                total_geral = 0.0
-                for chave_excel, nome_tela in ITENS:
-                    total = df_empresa[df_empresa['Tipo de Título'] == chave_excel]['Saldo'].sum() if not df_empresa.empty else 0.0
-                    if chave_excel == 'OBRIGACOES': total_geral -= total
-                    else: total_geral += total
-                    if chave_excel == 'DIF_TRANS_ADIANT': cor_fundo = '#e6e6e6'; estilo_fonte = 'italic'
-                    else: cor_fundo = '#ffffff'; estilo_fonte = 'normal'
-                    html += "<tr style='background-color:" + cor_fundo + "; font-style:" + estilo_fonte + "'>"
-                    html += "<td style='border:1px solid #000; padding:4px'>" + nome_tela + "</td>"
-                    html += "<td style='border:1px solid #000; padding:4px; text-align:right'>" + formatar_br(total) + "</td></tr>"
-                html += "<tr style='font-weight:bold; background:#f2f2f2'><td style='border:1px solid #000; padding:4px'>TOTAL</td><td style='border:1px solid #000; padding:4px; text-align:right'>" + formatar_br(total_geral) + "</td></tr></table>"
-                st.markdown(html, unsafe_allow_html=True)
-else:
-    st.info("Por favor, suba os 4 arquivos RFN para começar")
