@@ -41,7 +41,7 @@ def normalizar_chave_manual(chave):
 def normalizar_tipo(titulo):
     t = str(titulo).upper().strip()
     if 'CARTEIRA' in t: return 'CARTEIRA'
-    if 'MERCADO.PAGO' in t or 'MERCADO PAGO' in t: return 'MERCADO.PAGO'
+    if 'MERCADO.PAGO' in t or 'MERCADO PAGO' in t: return 'MERCADO PAGO'
     if 'VEICULO' in t or 'V-VEICULO' in t or 'VENDA VEIC' in t: return 'VEICULO'
     if 'SEGURADORA' in t or 'SEGURO' in t: return 'SEGURADORA'
     if 'GARANTIA' in t or 'VENDA GARANTIA' in t: return 'GARANTIA'
@@ -59,7 +59,7 @@ def normalizar_tipo(titulo):
     return 'OUTROS'
 
 ITENS = [
-    ('CARTEIRA', 'CARTEIRA'), ('MERCADO.PAGO', 'MERCADO.PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
+    ('CARTEIRA', 'CARTEIRA'), ('MERCADO PAGO', 'MERCADO PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
     ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
