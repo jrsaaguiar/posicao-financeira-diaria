@@ -47,6 +47,7 @@ def normalizar_tipo(titulo):
     if 'GARANTIA' in t or 'VENDA GARANTIA' in t: return 'GARANTIA'
     if 'BANCO' in t: return 'BANCO'
     if 'CARTAO' in t or 'CARTÕES' in t or 'CARTAO DE CREDITO' in t or 'CREDITO' in t: return 'CARTAO'
+    if 'FUNDAO NOVOS' in t or 'FUNDAO' in t: return 'FUNDAO NOVOS' # <- OK, está na ordem certa
     if 'NOVOS PAGOS' in t or 'NOVOS.PAGOS' in t: return 'NOVOS PAGOS'
     if 'USADOS PAGOS' in t or 'USADOS.PAGOS' in t or 'USADOS' in t: return 'USADOS PAGOS'
     if 'FIDIC' in t: return 'FIDIC'
@@ -61,7 +62,7 @@ def normalizar_tipo(titulo):
 ITENS = [
     ('CARTEIRA', 'CARTEIRA'), ('MERCADO PAGO', 'MERCADO PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),
     ('GARANTIA', 'GARANTIA'), ('BANCO', 'BANCOS'), ('CARTAO', 'CARTOES'),
-    ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),
+    ('NOVOS PAGOS', 'NOVOS.PAGOS'),('USADOS PAGOS', 'USADOS.PAGOS'),('FUNDAO NOVOS', 'FUNDAO.NOVOS'), # <- padronizei com ponto
     ('H.B.PECAS', 'H.B.PECAS'), ('FIDIC', 'FIDIC'),
     ('ESTOQUE PECAS', 'EST.PECAS'), ('OBRIGACOES', 'OBRIG. A PAGA'),('ADIANTAMENTO', 'ADIANTAMENTOS'),
     ('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')
