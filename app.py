@@ -119,12 +119,7 @@ def gerar_excel(df_para_exportar, empresas_selecionadas):
     return output.getvalue()
 
 # ================= LEITURA DOS ARQUIVOS VIA UPLOAD =================
-uploaded_files = st.file_uploader(
-    "Arraste os 4 arquivos RFN aqui",
-    type=['xlsx', 'xls'],
-    accept_multiple_files=True
-)
-
+uploaded_files = st.file_uploader("Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True)
 manual_file = st.file_uploader("Opcional: Suba o valores_manuais.json", type=['json'])
 
 valores_iniciais = {
@@ -266,62 +261,51 @@ if uploaded_files:
         else:
             st.error("Não consegui ler os dados dos arquivos")
 
-    # ================= TABELA + DOWNLOAD =================
+    # ================= TABELA + DOWNLOAD EM 3 COLUNAS =================
     if 'df_final' in st.session_state:
         df = st.session_state['df_final']
 
         st.markdown("### POSIÇÃO FINANCEIRA DIÁRIA")
-        c1, c2, c3 = st.columns([3, 1, 1])
-        with c2: st.markdown("**DATA**")
+        c1, c2, c3 = st.columns([1,1,1])
+        with c1: st.markdown("**DATA**")
+        with c2: st.write("")
         with c3: st.markdown(f"**{date.today().strftime('%d/%m/%Y')}**")
         st.divider()
 
-        # 1. FILTROS
+        # 1. FILTROS + EXPORTAR
         with st.sidebar:
             st.markdown("### Filtros")
             empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
             st.divider()
             st.markdown("### Exportar")
+            excel_data = gerar_excel(df, empresas_selecionadas)
+            st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        # 2. TABELA ORGANIZADA COM DATAFRAME
-        empresas_ordem = ['MATRIZ', 'WS', 'EUSEBIO']
-        for emp in empresas_ordem:
-            if emp not in empresas_selecionadas: continue
+        # 2. CABECALHO DAS 3 EMPRESAS
+        col1, col2, col3 = st.columns(3)
+        with col1: st.markdown("<div style='border:2px solid black; padding:10px; text-align:center; font-weight:bold'>MATRIZ</div>", unsafe_allow_html=True)
+        with col2: st.markdown("<div style='border:2px solid black; padding:10px; text-align:center; font-weight:bold'>WS</div>", unsafe_allow_html=True)
+        with col3: st.markdown("<div style='border:2px solid black; padding:10px; text-align:center; font-weight:bold'>EUSEBIO</div>", unsafe_allow_html=True)
 
-            st.markdown(f"#### {emp}")
-            dados_tabela = []
-            total_geral = 0.0
-            valores_por_item = {}
-
-            for item_chave, item_nome in ITENS:
+        # 3. DADOS LADO A LADO
+        for item_chave, item_nome in ITENS:
+            col1, col2, col3 = st.columns(3)
+            
+            valores = {}
+            for i, emp in enumerate(['MATRIZ', 'WS', 'EUSEBIO']):
                 total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
-
                 if item_chave == 'DIF_TRANS_ADIANT':
                     trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
                     adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTO') & (df['Empresa'] == emp)]['Saldo'].sum()
                     total = trans_valor - adiant_valor if trans_valor > 0 else 0.0
-
-                valores_por_item[item_chave] = total
-                if item_chave == 'OBRIGACOES': total_geral -= total
-                else: total_geral += total
-
-                dados_tabela.append({"Item": item_nome, "Valor": formatar_br(total)})
-
-            dados_tabela.append({"Item": "TOTAL", "Valor": formatar_br(total_geral)})
-
-            df_mostrar = pd.DataFrame(dados_tabela)
-            st.dataframe(df_mostrar, hide_index=True, use_container_width=True, column_config={
-                "Item": st.column_config.TextColumn("Item", width="large"),
-                "Valor": st.column_config.TextColumn("Valor R$", width="medium")
-            })
-            st.divider()
-
-        # 3. BOTAO DE DOWNLOAD
-        with st.sidebar:
-            excel_data = gerar_excel(df, empresas_selecionadas)
-            st.download_button(
-                label="📥 Baixar Excel",
-                data=excel_data,
-                file_name=f"Posicao_Financeira_{date.today().strftime('%d%m%Y')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                valores[emp] = total
+            
+            with col1:
+                st.markdown(f"**{item_nome}**")
+                st.text_input("", formatar_br(valores['MATRIZ']), key=f"m_{item_chave}", label_visibility="collapsed", disabled=True)
+            with col2:
+                st.markdown(f"**{item_nome}**")
+                st.text_input("", formatar_br(valores['WS']), key=f"ws_{item_chave}", label_visibility="collapsed", disabled=True)
+            with col3:
+                st.markdown(f"**{item_nome}**")
+                st.text_input("", formatar_br(valores['EUSEBIO']), key=f"eus_{item_chave}", label_visibility="collapsed", disabled=True)
