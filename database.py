@@ -18,5 +18,7 @@ class PosicaoDiaria(Base):
     qtd_veiculos = Column(Integer, default=0)
     valor_medio = Column(Float, default=0.0)
 
-# Cria a tabela se não existir
-Base.metadata.create_all(bind=engine)
+def init_db():
+    Base.metadata.create_all(bind=engine)
+
+init_db() # Força criar na hora
