@@ -128,7 +128,7 @@ ITENS_MANUAIS = [
     ('FIDIC', 'FIDIC'), ('H.B.PECAS', 'H.B.PECAS'),
     ('ESTOQUE PECAS', 'ESTOQUE PECAS')
 ]
-
+# Carrega Valores manuais do banco
 def carregar_valores_manuais_do_banco(data_ref):
     db = SessionLocal()
     valores = {
@@ -148,7 +148,7 @@ def carregar_valores_manuais_do_banco(data_ref):
     for reg in registros:
         valores[reg.empresa][reg.tipo_titulo] = formatar_br(reg.valor).replace('R$ ', '')
         if reg.tipo_titulo in ['NOVOS PAGOS', 'USADOS PAGOS']:
-            valores_qtd[reg.empresa][reg.tipo_titulo] = int(reg.qtd_veiculos or 0) # <- garante int
+            valores_qtd[reg.empresa][reg.tipo_titulo] = int(reg.qtd_veiculos or 0) # <- GARANTE INT
     db.close()
     return valores, valores_qtd
 
@@ -199,7 +199,7 @@ def zerar_banco():
     db.commit()
     db.close()
     return qtd
-
+# Gerar excel exporta empresas selecionadas.
 def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo_str):
     output = BytesIO()
     data_excel = date.fromisoformat(data_titulo_str).strftime('%d/%m/%Y')
@@ -247,14 +247,7 @@ def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo_str):
                     total_valor = adiant_valor - trans_valor if trans_valor > 0 else 0.0
                 cell_desc = worksheet.cell(row=linha_dados, column=col_inicio, value=item_nome); cell_desc.border = border_fina
                 if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                    qtd_atual = valores_qtd_iniciais[emp][item_chave]
-                    valores_qtd_digitados[emp][item_chave] = st.number_input(
-                        "Qtd",
-                        value=int(qtd_atual), # <- FORÇA SER INT
-                        key=key_qtd,
-                        min_value=0,
-                        step=1 # <- garante que só aceita inteiro
-                    )
+                    valor_formatado = formatar_br(total_valor).replace('R$ ', '') # <- CORRIGIDO
                     cell_valor = worksheet.cell(row=linha_dados, column=col_inicio+1, value=f"{valor_formatado} - {int(total_qtd)}")
                     cell_valor.alignment = right; cell_valor.border = border_fina
                 else:
@@ -444,9 +437,10 @@ with tab1:
                     if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
                         valores_qtd_digitados[emp][item_chave] = st.number_input(
                             "Qtd",
-                            value=valores_qtd_iniciais[emp][item_chave],
+                            value=int(valores_qtd_iniciais[emp][item_chave]), # <- INT
                             key=key_qtd,
-                            min_value=0
+                            min_value=0,
+                            step=1 # <- STEP
                         )
         
         if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
