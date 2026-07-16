@@ -21,4 +21,4 @@ class PosicaoDiaria(Base):
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-init_db() # Força criar na hora
+init_db() # Cria a tabela assim que o arquivo é importado
