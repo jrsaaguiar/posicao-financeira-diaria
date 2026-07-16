@@ -18,6 +18,14 @@ class PosicaoDiaria(Base):
     qtd_veiculos = Column(Integer, default=0)
     valor_medio = Column(Float, default=0.0)
 
+class Usuarios(Base):
+    __tablename__ = 'usuarios'
+    id = Column(Integer, primary_key=True)
+    email = Column(String(100), unique=True, nullable=False)
+    senha_hash = Column(String(255), nullable=False)
+    nome = Column(String(100))
+    ativo = Column(Boolean, default=True)
+    
 def init_db():
     Base.metadata.create_all(bind=engine)
 
