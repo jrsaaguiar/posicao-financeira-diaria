@@ -5,6 +5,7 @@ from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria
+init_db() # <--- COLA ESSA LINHA AQUI
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
