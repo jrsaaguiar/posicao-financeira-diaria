@@ -11,7 +11,7 @@ Base = declarative_base()
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
     id = Column(Integer, primary_key=True, index=True)
-    data = Column(Date)
+    data = Column(String)  # <- MUDEI DE Date PARA String
     empresa = Column(String)
     tipo_titulo = Column(String)
     valor = Column(Float)
