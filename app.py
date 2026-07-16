@@ -4,16 +4,8 @@ from datetime import date, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
-from database import SessionLocal, PosicaoDiaria, Usuarios # <- importa os 3
+from database import SessionLocal, PosicaoDiaria, Usuarios # <- só importa
 import hashlib
-
-class Usuarios(Base): # <- agora Base existe
-    __tablename__ = 'usuarios'
-    id = Column(Integer, primary_key=True)
-    email = Column(String)
-    senha_hash = Column(String)
-    nome = Column(String)
-    ativo = Column(Boolean)
 
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
