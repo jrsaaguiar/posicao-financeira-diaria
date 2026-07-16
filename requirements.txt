@@ -1,8 +1,5 @@
 streamlit
 pandas
+sqlalchemy
+psycopg2-binary
 openpyxl
-xlrd
-SQLAlchemy==2.0.30
-psycopg2-binary==2.9.9  # pra Postgres
-# ou
-pymysql==1.1.1          # pra MySQL
