@@ -4,8 +4,7 @@ from datetime import date, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
-from database import SessionLocal, PosicaoDiaria, Base # <- adiciona Base
-from sqlalchemy import Column, Integer, String, Boolean # <- adiciona isso
+from database import SessionLocal, PosicaoDiaria, Usuarios # <- importa os 3
 import hashlib
 
 class Usuarios(Base): # <- agora Base existe
