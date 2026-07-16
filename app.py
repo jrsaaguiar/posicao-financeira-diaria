@@ -1,10 +1,17 @@
 import pandas as pd
 import streamlit as st
-from datetime import date, timedelta
+from datetime import date, timedelta  # <- só 1 vez
 from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria
+
+# Data de hoje em 2 formatos
+DATA_REF_DATE = date.today() # <- pra fazer conta
+DATA_REF = DATA_REF_DATE.strftime("%Y-%m-%d") # <- pra buscar no banco
+
+# Empresas
+EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
 st.title("Dashboard Financeira Diária")
@@ -286,9 +293,10 @@ with tab1:
         for emp, col in empresas_cards.items():
             if emp not in empresas_selecionadas: continue
             with col:
-                total_hoje = get_total_empresa(DATA_REF, emp)
-                data_ontem = DATA_REF - timedelta(days=1) # <- precisa do timedelta lá em cima
-                variacao = get_variacao_empresa(DATA_REF, data_ontem, emp)
+                total_hoje = get_total_empresa(DATA_REF, emp) # string
+                data_ontem_date = DATA_REF_DATE - timedelta(days=1) # faz -1 dia
+                data_ontem = data_ontem_date.strftime("%Y-%m-%d") # vira string
+                variacao = get_variacao_empresa(DATA_REF, data_ontem, emp) # string
                 
                 st.metric(
                     label=f"TOTAL {emp}",
