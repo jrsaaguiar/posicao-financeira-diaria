@@ -6,9 +6,6 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria
 
-# Data de hoje em 2 formatos
-DATA_REF_DATE = date.today() # <- pra fazer conta
-DATA_REF = DATA_REF_DATE.strftime("%Y-%m-%d") # <- pra buscar no banco
 
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
@@ -281,7 +278,9 @@ def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo):
 with tab1:
     with st.sidebar:
         st.markdown("### Data de Referência do Lançamento")
-        DATA_REF = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY", key="data_lancamento")
+        DATA_REF_DATE = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY", key="data_lancamento") # <- continua sendo date
+        DATA_REF = DATA_REF_DATE.strftime("%Y-%m-%d") # <- converte pra string pra buscar no banco
+        
         st.markdown("### Filtros")
         empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
         st.divider()
@@ -293,15 +292,15 @@ with tab1:
         for emp, col in empresas_cards.items():
             if emp not in empresas_selecionadas: continue
             with col:
-                total_hoje = get_total_empresa(DATA_REF, emp) # string
-                data_ontem_date = DATA_REF_DATE - timedelta(days=1) # faz -1 dia
+                total_hoje = get_total_empresa(DATA_REF, emp) # usa string
+                data_ontem_date = DATA_REF_DATE - timedelta(days=1) # faz conta com date
                 data_ontem = data_ontem_date.strftime("%Y-%m-%d") # vira string
-                variacao = get_variacao_empresa(DATA_REF, data_ontem, emp) # string
+                variacao = get_variacao_empresa(DATA_REF, data_ontem, emp)
                 
                 st.metric(
                     label=f"TOTAL {emp}",
                     value=formatar_compacto(total_hoje),
-                    delta=f"{variacao:.2f}%" if variacao is not None else None # <- mostra %
+                    delta=f"{variacao:.2f}%" if variacao is not None else None
                 )
         st.divider()
 
