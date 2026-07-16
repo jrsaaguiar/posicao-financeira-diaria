@@ -4,10 +4,11 @@ from datetime import date, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
-from database import SessionLocal, PosicaoDiaria
+from database import SessionLocal, PosicaoDiaria, Base # <- adiciona Base
+from sqlalchemy import Column, Integer, String, Boolean # <- adiciona isso
 import hashlib
 
-class Usuarios(Base):
+class Usuarios(Base): # <- agora Base existe
     __tablename__ = 'usuarios'
     id = Column(Integer, primary_key=True)
     email = Column(String)
@@ -19,6 +20,42 @@ class Usuarios(Base):
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
+def tela_login():
+    st.title("🔒 Acesso Restrito - Posição Diária")
+    
+    with st.form("login"):
+        email = st.text_input("Email")
+        senha = st.text_input("Senha", type="password")
+        entrar = st.form_submit_button("Entrar")
+        
+        if entrar:
+            db = SessionLocal()
+            senha_hash = hashlib.sha256(senha.encode()).hexdigest()
+            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
+            db.close()
+            
+            if user:
+                st.session_state['logado'] = True
+                st.session_state['usuario'] = user.nome
+                st.session_state['email'] = user.email
+                st.rerun()
+            else:
+                st.error("Email ou senha inválidos")
+
+# TRAVA
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+
+if not st.session_state['logado']:
+    tela_login()
+    st.stop() # para tudo aqui se não logou
+
+# SIDEBAR
+st.sidebar.success(f"Logado: {st.session_state['usuario']}")
+if st.sidebar.button("Sair"):
+    for key in ['logado', 'usuario', 'email']:
+        st.session_state.pop(key, None)
+    st.rerun()
 st.title("Dashboard Financeira Diária")
 st.markdown("""
 <style>
