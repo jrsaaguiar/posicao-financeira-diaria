@@ -1,6 +1,7 @@
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date
 from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
+from database import SessionLocal, PosicaoDiaria, Usuarios
 
 DATABASE_URL = st.secrets["DATABASE_URL"]
 
