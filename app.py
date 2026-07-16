@@ -406,141 +406,88 @@ with tab1:
         
         # def carregar_manuais_adiantamentos()
         def carregar_manuais(valores_digitados, valores_qtd_digitados):
-    dados = []
-    for empresa, itens in valores_digitados.items():
-        for tipo, valor_str in itens.items():
-            valor = converter_valor_br(valor_str)
-            qtd = valores_qtd_digitados[empresa].get(tipo, 0)
-            valor_medio = valor / qtd if qtd > 0 else 0.0
-            dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor, 'Qtd': qtd, 'ValorMedio': valor_medio})
-    return pd.DataFrame(dados)
-
-col_m, col_ws, col_e = st.columns(3)
-valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-valores_qtd_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
-
-for emp, col in empresas_col.items():
-    with col:
-        st.markdown(f"**{emp}**")
-        for item_chave, item_nome in ITENS_MANUAIS:
-            st.markdown(f"{item_nome}")
-            key_valor = f"{emp}_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
-            key_qtd = f"{emp}_QTD_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
-
-            valores_digitados[emp][item_chave] = st.text_input(
-                label="",
-                value=valores_iniciais[emp][item_chave],
-                key=key_valor,
-                label_visibility="collapsed"
-            )
-            if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                valores_qtd_digitados[emp][item_chave] = st.number_input(
-                    "Qtd",
-                    value=valores_qtd_iniciais[emp][item_chave],
-                    key=key_qtd,
-                    min_value=0
-                )
-
-if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
-    if uploaded_files:
-        lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados, valores_qtd_digitados)]
-        lista_df = [df for df in lista_df if not df.empty]
-        if lista_df:
-            df = pd.concat(lista_df, ignore_index=True)
-            df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
-            df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0)
-            empresas = df['Empresa'].unique()
-            novas_linhas = []
-            for emp in empresas:
-                trans = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'TRANSITORIA')]['Saldo'].sum()
-                adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTOS')]['Saldo'].sum()
-                if trans > 0:
-                    dif = adiant - trans
-                    if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
-            if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-            salvar_posicao_no_banco(df, DATA_MANUTENCAO, modo='novo')
-            st.session_state['df_final'] = df
-            st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} ATUALIZADOS no banco!")
-    else:
-        df_manual = carregar_manuais(valores_digitados, valores_qtd_digitados)
-        salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO, modo='manutencao')
-        if 'df_carregado_manut' in st.session_state:
-            del st.session_state['df_carregado_manut']
-        st.success(f"Manutenção salva! Data: {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}")
-    st.rerun()
-
-if 'df_final' in st.session_state:
-    df = st.session_state['df_final']
-    with st.sidebar:
-        excel_data = gerar_excel(df, empresas_selecionadas, DATA_REF)
-        st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{DATA_REF.replace('-', '')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    col1, col2, col3 = st.columns(3)
-    empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
-    for emp, col in empresas_cols.items():
-        if emp not in empresas_selecionadas: continue
-        with col:
-            dados_tabela = []
-            total_geral = 0.0
-            for item_chave, item_nome in ITENS:
-                total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
-                total_qtd = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Qtd'].sum()
-                if item_chave == 'DIF_TRANS_ADIANT':
-                    trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
-                    adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTOS') & (df['Empresa'] == emp)]['Saldo'].sum()
-                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
-                if item_chave == 'OBRIG. A PAGA':
-                    total_geral -= total
-                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
-                    total_geral += total
-                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                    valor_formatado = formatar_br(total).replace('R$ ', '')
-                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": f"{valor_formatado} - {int(total_qtd)}"})
-                else:
-                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
-            dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
-            df_mostrar = pd.DataFrame(dados_tabela)
-            st.dataframe(df_mostrar, hide_index=True, use_container_width=True, height=680, column_config={
-                "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
-                "VALORES": st.column_config.TextColumn("VALORES")
-            })
-
-with tab2:
-    st.header("Consulta de Posições Salvas")
-    with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
-        st.warning("Isso vai apagar TODAS as datas do banco. Use só pra zerar e recomeçar.")
-        if st.button("🗑️ ZERAR BANCO COMPLETO"):
-            qtd_apagada = zerar_banco()
-            st.success(f"Banco zerado! {qtd_apagada} registros apagados.")
+            dados = []
+            for empresa, itens in valores_digitados.items():
+                for tipo, valor_str in itens.items():
+                    valor = converter_valor_br(valor_str)
+                    qtd = valores_qtd_digitados[empresa].get(tipo, 0)
+                    valor_medio = valor / qtd if qtd > 0 else 0.0
+                    dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor, 'Qtd': qtd, 'ValorMedio': valor_medio})
+            return pd.DataFrame(dados)
+        
+        col_m, col_ws, col_e = st.columns(3)
+        valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
+        valores_qtd_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
+        empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
+        
+        for emp, col in empresas_col.items():
+            with col:
+                st.markdown(f"**{emp}**")
+                for item_chave, item_nome in ITENS_MANUAIS:
+                    st.markdown(f"{item_nome}")
+                    key_valor = f"{emp}_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
+                    key_qtd = f"{emp}_QTD_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
+        
+                    valores_digitados[emp][item_chave] = st.text_input(
+                        label="",
+                        value=valores_iniciais[emp][item_chave],
+                        key=key_valor,
+                        label_visibility="collapsed"
+                    )
+                    if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
+                        valores_qtd_digitados[emp][item_chave] = st.number_input(
+                            "Qtd",
+                            value=valores_qtd_iniciais[emp][item_chave],
+                            key=key_qtd,
+                            min_value=0
+                        )
+        
+        if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
+            if uploaded_files:
+                lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados, valores_qtd_digitados)]
+                lista_df = [df for df in lista_df if not df.empty]
+                if lista_df:
+                    df = pd.concat(lista_df, ignore_index=True)
+                    df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
+                    df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0)
+                    empresas = df['Empresa'].unique()
+                    novas_linhas = []
+                    for emp in empresas:
+                        trans = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'TRANSITORIA')]['Saldo'].sum()
+                        adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTOS')]['Saldo'].sum()
+                        if trans > 0:
+                            dif = adiant - trans
+                            if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
+                    if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
+                    salvar_posicao_no_banco(df, DATA_MANUTENCAO, modo='novo')
+                    st.session_state['df_final'] = df
+                    st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} ATUALIZADOS no banco!")
+            else:
+                df_manual = carregar_manuais(valores_digitados, valores_qtd_digitados)
+                salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO, modo='manutencao')
+                if 'df_carregado_manut' in st.session_state:
+                    del st.session_state['df_carregado_manut']
+                st.success(f"Manutenção salva! Data: {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}")
             st.rerun()
-
-    col1, col2 = st.columns([2,3])
-    with col1:
-        data_consulta_date = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY")
-        data_consulta = data_consulta_date.strftime("%Y-%m-%d")
-
-    if st.button("Carregar Dados da Data"):
-        db = SessionLocal()
-        registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_consulta).all()
-        db.close()
-        if not registros:
-            st.warning(f"Nenhum dado encontrado para {data_consulta_date.strftime('%d/%m/%Y')}")
-        else:
-            dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'Valor Medio': r.valor_medio} for r in registros]
-            df_hist = pd.DataFrame(dados)
-            st.success(f"{len(df_hist)} registros encontrados para {data_consulta_date.strftime('%d/%m/%Y')}")
+        
+        if 'df_final' in st.session_state:
+            df = st.session_state['df_final']
+            with st.sidebar:
+                excel_data = gerar_excel(df, empresas_selecionadas, DATA_REF)
+                st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{DATA_REF.replace('-', '')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             col1, col2, col3 = st.columns(3)
             empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
             for emp, col in empresas_cols.items():
+                if emp not in empresas_selecionadas: continue
                 with col:
                     dados_tabela = []
                     total_geral = 0.0
                     for item_chave, item_nome in ITENS:
-                        total = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Saldo'].sum()
-                        total_qtd = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Qtd'].sum()
+                        total = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Saldo'].sum()
+                        total_qtd = df[(df['Tipo de Título'] == item_chave) & (df['Empresa'] == emp)]['Qtd'].sum()
                         if item_chave == 'DIF_TRANS_ADIANT':
-                            trans_valor = df_hist[(df_hist['Tipo de Título'] == 'TRANSITORIA') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
-                            adiant_valor = df_hist[(df_hist['Tipo de Título'] == 'ADIANTAMENTOS') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
+                            trans_valor = df[(df['Tipo de Título'] == 'TRANSITORIA') & (df['Empresa'] == emp)]['Saldo'].sum()
+                            adiant_valor = df[(df['Tipo de Título'] == 'ADIANTAMENTOS') & (df['Empresa'] == emp)]['Saldo'].sum()
                             total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
                         if item_chave == 'OBRIG. A PAGA':
                             total_geral -= total
@@ -557,10 +504,63 @@ with tab2:
                         "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
                         "VALORES": st.column_config.TextColumn("VALORES")
                     })
-            excel_data_hist = gerar_excel(df_hist, ['MATRIZ', 'WS', 'EUSEBIO'], data_consulta)
-            st.download_button(
-                label=f"📊 Baixar Planilha de {data_consulta_date.strftime('%d/%m/%Y')}",
-                data=excel_data_hist,
+        
+        with tab2:
+            st.header("Consulta de Posições Salvas")
+            with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
+                st.warning("Isso vai apagar TODAS as datas do banco. Use só pra zerar e recomeçar.")
+                if st.button("🗑️ ZERAR BANCO COMPLETO"):
+                    qtd_apagada = zerar_banco()
+                    st.success(f"Banco zerado! {qtd_apagada} registros apagados.")
+                    st.rerun()
+        
+            col1, col2 = st.columns([2,3])
+            with col1:
+                data_consulta_date = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY")
+                data_consulta = data_consulta_date.strftime("%Y-%m-%d")
+        
+            if st.button("Carregar Dados da Data"):
+                db = SessionLocal()
+                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_consulta).all()
+                db.close()
+                if not registros:
+                    st.warning(f"Nenhum dado encontrado para {data_consulta_date.strftime('%d/%m/%Y')}")
+                else:
+                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'Valor Medio': r.valor_medio} for r in registros]
+                    df_hist = pd.DataFrame(dados)
+                    st.success(f"{len(df_hist)} registros encontrados para {data_consulta_date.strftime('%d/%m/%Y')}")
+                    col1, col2, col3 = st.columns(3)
+                    empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
+                    for emp, col in empresas_cols.items():
+                        with col:
+                            dados_tabela = []
+                            total_geral = 0.0
+                            for item_chave, item_nome in ITENS:
+                                total = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Saldo'].sum()
+                                total_qtd = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Qtd'].sum()
+                                if item_chave == 'DIF_TRANS_ADIANT':
+                                    trans_valor = df_hist[(df_hist['Tipo de Título'] == 'TRANSITORIA') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
+                                    adiant_valor = df_hist[(df_hist['Tipo de Título'] == 'ADIANTAMENTOS') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
+                                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
+                                if item_chave == 'OBRIG. A PAGA':
+                                    total_geral -= total
+                                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
+                                    total_geral += total
+                                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
+                                    valor_formatado = formatar_br(total).replace('R$ ', '')
+                                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": f"{valor_formatado} - {int(total_qtd)}"})
+                                else:
+                                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
+                            dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
+                            df_mostrar = pd.DataFrame(dados_tabela)
+                            st.dataframe(df_mostrar, hide_index=True, use_container_width=True, height=680, column_config={
+                                "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
+                                "VALORES": st.column_config.TextColumn("VALORES")
+                            })
+                    excel_data_hist = gerar_excel(df_hist, ['MATRIZ', 'WS', 'EUSEBIO'], data_consulta)
+                    st.download_button(
+                        label=f"📊 Baixar Planilha de {data_consulta_date.strftime('%d/%m/%Y')}",
+                        data=excel_data_hist,
                 file_name=f"Posicao_Financeira_{data_consulta.replace('-', '')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
