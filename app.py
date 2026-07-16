@@ -5,6 +5,15 @@ from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria
+import hashlib
+
+class Usuarios(Base):
+    __tablename__ = 'usuarios'
+    id = Column(Integer, primary_key=True)
+    email = Column(String)
+    senha_hash = Column(String)
+    nome = Column(String)
+    ativo = Column(Boolean)
 
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
