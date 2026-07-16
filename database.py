@@ -1,7 +1,6 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
-from database import SessionLocal, PosicaoDiaria, Usuarios
 
 DATABASE_URL = st.secrets["DATABASE_URL"]
 
@@ -12,7 +11,7 @@ Base = declarative_base()
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
     id = Column(Integer, primary_key=True, index=True)
-    data = Column(String)  # <- MUDEI DE Date PARA String
+    data = Column(String)  
     empresa = Column(String)
     tipo_titulo = Column(String)
     valor = Column(Float)
@@ -30,4 +29,5 @@ class Usuarios(Base):
 def init_db():
     Base.metadata.create_all(bind=engine)
 
+init_db()
 init_db() # Cria a tabela assim que o arquivo é importado
