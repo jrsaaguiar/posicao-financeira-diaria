@@ -56,7 +56,30 @@ if st.session_state['logado']:
 
     # <- COLA AQUI: Só aparece se for Admin
     if st.session_state['perfil'] == 'Admin':
-        with st.sidebar.expander("⚙️ Gerenciar Usuários"):
+        with st.sidebar.expander("👥 Gerenciar Usuários"):
+            
+            # 1. LISTA DE USUÁRIOS
+            st.markdown("#### Usuários Cadastrados")
+            db = SessionLocal()
+            users = db.query(Usuarios).order_by(Usuarios.id.desc()).all()
+            db.close()
+            
+            if users:
+                df_users = pd.DataFrame([{
+                    'ID': u.id, 
+                    'Nome': u.nome, 
+                    'Email': u.email, 
+                    'Perfil': u.perfil,
+                    'Ativo': u.ativo
+                } for u in users])
+                st.dataframe(df_users, use_container_width=True, hide_index=True, height=200)
+            else:
+                st.warning("Nenhum usuário cadastrado")
+            
+            st.divider()
+            
+            # 2. CADASTRO DE USUÁRIO
+            st.markdown("#### Cadastrar Novo")
             tela_cadastro_usuario()
 
     if st.sidebar.button("Sair"):
