@@ -45,26 +45,25 @@ if not st.session_state['logado']:
     st.stop() # para tudo aqui se não logou
 
 # SIDEBAR
-#st.sidebar.success(f"Logado: {st.session_state['usuario']}")
-st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
+if st.session_state['logado']:
+    # Pega o perfil do usuário do banco SÓ se estiver logado
+    db = SessionLocal()
+    user_db = db.query(Usuarios).filter_by(email=st.session_state['email']).first()
+    st.session_state['perfil'] = user_db.perfil if user_db else "Usuario"
+    db.close()
+    
+    st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
-# Pega o perfil do usuário do banco
-db = SessionLocal()
-user_db = db.query(Usuarios).filter_by(email=st.session_state['email']).first()
-st.session_state['perfil'] = user_db.perfil if user_db else "Usuario"
-db.close()
+    # <- COLA AQUI: Só aparece se for Admin
+    if st.session_state['perfil'] == 'Admin':
+        with st.sidebar.expander("⚙️ Gerenciar Usuários"):
+            tela_cadastro_usuario()
 
-st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
-
-# <- COLA AQUI: Só aparece se for Admin
-if st.session_state['perfil'] == 'Admin':
-    with st.sidebar.expander("⚙️ Gerenciar Usuários"):
-        tela_cadastro_usuario()
-
-if st.sidebar.button("Sair"):
-    for key in ['logado', 'usuario', 'email', 'perfil']:
-        st.session_state.pop(key, None)
-    st.rerun()
+    if st.sidebar.button("Sair"):
+        for key in ['logado', 'usuario', 'email', 'perfil']:
+            st.session_state.pop(key, None)
+        st.rerun()
+        
 st.title("Dashboard Financeira Diária")
 st.markdown("""
 <style>
