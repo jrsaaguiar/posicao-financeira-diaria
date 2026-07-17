@@ -105,7 +105,7 @@ def detectar_empresa(nome):
     if 'WS' in nome: return 'WS'
     if 'EUSEBIO' in nome: return 'EUSEBIO'
     return 'OUTROS'
-
+#-------
 @st.cache_data
 def get_total_empresa(data, empresa):
     """Calcula o total líquido da empresa na data"""
@@ -115,7 +115,7 @@ def get_total_empresa(data, empresa):
         
     db = SessionLocal()
     regs = db.query(PosicaoDiaria).filter(
-        PosicaoDiaria.data == data, # <- agora é date
+        PosicaoDiaria.data == data,
         PosicaoDiaria.empresa == empresa
     ).all()
     db.close()
@@ -132,6 +132,10 @@ def get_total_empresa(data, empresa):
 @st.cache_data
 def get_variacao_empresa(data_hoje, data_ontem, empresa):
     """Calcula a variação % vs dia anterior"""
+    # Converte pra date pra não bugar o cache
+    if isinstance(data_hoje, str): data_hoje = date.fromisoformat(data_hoje)
+    if isinstance(data_ontem, str): data_ontem = date.fromisoformat(data_ontem)
+        
     total_hoje = get_total_empresa(data_hoje, empresa)
     total_ontem = get_total_empresa(data_ontem, empresa)
 
