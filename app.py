@@ -566,7 +566,8 @@ with tab1:
                     })
         # ---- Tabela2 -------
         with tab2:
-            st.header("Consulta de Posições Salvas")
+            st.header("📊 Relatórios e Auditoria")
+            
             with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
                 st.warning("Isso vai apagar TODAS as datas do banco. Use só pra zerar e recomeçar.")
                 if st.button("🗑️ ZERAR BANCO COMPLETO"):
@@ -574,68 +575,74 @@ with tab1:
                     st.success(f"Banco zerado! {qtd_apagada} registros apagados.")
                     st.rerun()
         
-            col1, col2 = st.columns([2,3])
+            st.divider()
+            st.subheader("Gerar Relatório de Auditoria por Período")
+            
+            col1, col2, col3 = st.columns(3)
             with col1:
-                data_consulta_date = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY")
-                data_consulta = data_consulta_date.strftime("%Y-%m-%d")
-        
-            if st.button("Carregar Dados da Data"):
+                data_inicio = st.date_input("Data Inicial", value=date.today() - timedelta(days=7))
+            with col2:
+                data_fim = st.date_input("Data Final", value=date.today())
+            with col3:
                 db = SessionLocal()
-                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_consulta).all()
+                usuarios = [u[0] for u in db.query(Usuarios.email).filter(Usuarios.ativo==True).all()]
                 db.close()
-                if not registros:
-                    st.warning(f"Nenhum dado encontrado para {data_consulta_date.strftime('%d/%m/%Y')}")
-                else:
-                    # <- AQUI ADICIONEI 'Lançado por'
-                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'Valor Medio': r.valor_medio, 'Lançado por': r.criado_por} for r in registros]
-                    df_hist = pd.DataFrame(dados)
-                    st.success(f"{len(df_hist)} registros encontrados para {data_consulta_date.strftime('%d/%m/%Y')}")
-                    
-                    col1, col2, col3 = st.columns(3)
-                    empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
-                    for emp, col in empresas_cols.items():
-                        with col:
-                            dados_tabela = []
-                            total_geral = 0.0
-                            for item_chave, item_nome in ITENS:
-                                total = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Saldo'].sum()
-                                total_qtd = df_hist[(df_hist['Tipo de Título'] == item_chave) & (df_hist['Empresa'] == emp)]['Qtd'].sum()
-                                if item_chave == 'DIF_TRANS_ADIANT':
-                                    trans_valor = df_hist[(df_hist['Tipo de Título'] == 'TRANSITORIA') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
-                                    adiant_valor = df_hist[(df_hist['Tipo de Título'] == 'ADIANTAMENTOS') & (df_hist['Empresa'] == emp)]['Saldo'].sum()
-                                    total = adiant_valor - trans_valor if trans_valor > 0 else 0.0
-                                if item_chave == 'OBRIG. A PAGA':
-                                    total_geral -= total
-                                elif item_chave not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
-                                    total_geral += total
-                                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                                    valor_formatado = formatar_br(total).replace('R$ ', '')
-                                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": f"{valor_formatado} - {int(total_qtd)}"})
-                                else:
-                                    dados_tabela.append({"DESCRICAO": item_nome, "VALORES": formatar_br(total)})
-                            dados_tabela.append({"DESCRICAO": "TOTAL", "VALORES": formatar_br(total_geral)})
-                            df_mostrar = pd.DataFrame(dados_tabela)
-                            st.dataframe(df_mostrar, hide_index=True, use_container_width=True, height=680, column_config={
-                                "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
-                                "VALORES": st.column_config.TextColumn("VALORES")
-                            })
-                    
-                    
-                    # <- NOVA TABELA DE AUDITORIA
-                    st.divider()
-                    st.subheader("📋 Auditoria de Lançamentos")
-                    df_auditoria = df_hist[['Empresa', 'Tipo de Título', 'Saldo', 'Lançado por']].drop_duplicates().sort_values('Empresa')
-                    st.dataframe(df_auditoria, use_container_width=True, hide_index=True, column_config={
-                        "Empresa": "Empresa",
-                        "Tipo de Título": "Item",
-                        "Saldo": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
-                        "Lançado por": "Lançado por"
-                    })
+                usuario_filtro = st.selectbox("Filtrar por Usuário", ["Todos"] + usuarios)
+            
+            if st.button("📄 Gerar Relatório PDF", type="primary"):
+                db = SessionLocal()
+                query = db.query(PosicaoDiaria).filter(
+                    PosicaoDiaria.data >= data_inicio.strftime("%Y-%m-%d"),
+                    PosicaoDiaria.data <= data_fim.strftime("%Y-%m-%d")
+                )
+                if usuario_filtro!= "Todos":
+                    query = query.filter(PosicaoDiaria.criado_por == usuario_filtro)
+                registros = query.all()
+                db.close()
         
-                    excel_data_hist = gerar_excel(df_hist, ['MATRIZ', 'WS', 'EUSEBIO'], data_consulta)
+                if not registros:
+                    st.warning("Nenhum dado encontrado no período.")
+                else:
+                    df_rel = pd.DataFrame([{
+                        'Data': r.data, 'Empresa': r.empresa, 'Item': r.tipo_titulo, 
+                        'Valor': r.valor, 'Qtd': r.qtd_veiculos, 'Lançado por': r.criado_por
+                    } for r in registros])
+        
+                    # Gera PDF
+                    from reportlab.pdfgen import canvas
+                    from reportlab.lib.pagesizes import A4
+                    from reportlab.lib.units import cm
+                    from reportlab.platypus import Table, TableStyle
+                    from reportlab.lib import colors
+        
+                    buffer = BytesIO()
+                    c = canvas.Canvas(buffer, pagesize=A4)
+                    width, height = A4
+        
+                    c.setFont("Helvetica-Bold", 16)
+                    c.drawString(2*cm, height - 2*cm, "RELATÓRIO DE AUDITORIA - POSIÇÃO FINANCEIRA")
+                    c.setFont("Helvetica", 10)
+                    c.drawString(2*cm, height - 2.8*cm, f"Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+                    c.drawString(2*cm, height - 3.3*cm, f"Usuário Filtro: {usuario_filtro}")
+        
+                    # Resumo por empresa
+                    resumo = df_rel.groupby('Empresa')['Valor'].sum().reset_index()
+                    data_resumo = [['Empresa', 'Total Lançado']] + [[row['Empresa'], formatar_br(row['Valor'])] for _, row in resumo.iterrows()]
+                    t_resumo = Table(data_resumo, colWidths=[6*cm, 4*cm])
+                    t_resumo.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.grey), ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),('ALIGN',(0,0),(-1,-1),'CENTER'), ('GRID', (0,0), (-1,-1), 0.5, colors.black)]))
+                    t_resumo.wrapOn(c, width, height)
+                    t_resumo.drawOn(c, 2*cm, height - 6*cm)
+        
+                    c.showPage()
+                    c.save()
+                    pdf_data = buffer.getvalue()
+        
+                    st.success(f"{len(df_rel)} registros encontrados.")
+                    st.dataframe(df_rel, use_container_width=True, hide_index=True)
+        
                     st.download_button(
-                        label=f"📊 Baixar Planilha de {data_consulta_date.strftime('%d/%m/%Y')}",
-                        data=excel_data_hist,
-                        file_name=f"Posicao_Financeira_{data_consulta.replace('-', '')}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        label="⬇️ Baixar Relatório PDF",
+                        data=pdf_data,
+                        file_name=f"Relatorio_Auditoria_{data_inicio}_{data_fim}.pdf",
+                        mime="application/pdf"
                     )
