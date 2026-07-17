@@ -222,30 +222,35 @@ def carregar_valores_manuais_do_banco(data_ref):
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
     usuario_logado = st.session_state.get('email', 'sistema')
-    
+
     df = df.copy()
-    
-    # 1. LIMPEZA EXTREMA
+
+    # 1. GARANTE QUE TODAS AS COLUNAS EXISTEM
+    if 'Qtd' not in df.columns: df['Qtd'] = 0
+    if 'ValorMedio' not in df.columns: df['ValorMedio'] = 0.0
+
+    # 2. LIMPEZA EXTREMA - TIRA NaN, inf, string vazia
     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
     df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
     df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
     df['ValorMedio'] = df['ValorMedio'].replace([np.inf, -np.inf], 0.0)
-    
-    # 2. TIRA LINHAS VAZIAS - ISSO AQUI QUE ESTAVA QUEBRANDO
+
     df['Empresa'] = df['Empresa'].astype(str).str.strip()
     df['Tipo de Título'] = df['Tipo de Título'].astype(str).str.strip()
-    df = df[(df['Empresa'] != '') & (df['Empresa'] != 'nan')]
-    df = df[(df['Tipo de Título'] != '') & (df['Tipo de Título'] != 'nan')]
-    
-    # 3. Garante que data_ref é objeto date
+
+    # 3. TIRA LINHAS LIXO
+    df = df[(df['Empresa']!= '') & (df['Empresa']!= 'nan') & (df['Empresa']!= 'None')]
+    df = df[(df['Tipo de Título']!= '') & (df['Tipo de Título']!= 'nan') & (df['Tipo de Título']!= 'None')]
+
+    # 4. Garante que data_ref é objeto date
     if isinstance(data_ref, str):
         data_ref = date.fromisoformat(data_ref)
-    
+
     if df.empty:
         st.warning("Nenhuma linha válida para salvar")
         db.close()
         return
-    
+
     try:
         if modo == 'manutencao':
             for _, row in df.iterrows():
@@ -265,7 +270,7 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                         valor=float(row['Saldo']), qtd_veiculos=int(row['Qtd']),
                         valor_medio=float(row['ValorMedio']), criado_por=usuario_logado
                     ))
-        else:
+        else: # modo novo
             db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
             objs = []
             for _, row in df.iterrows():
@@ -274,16 +279,16 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                     valor=float(row['Saldo']), qtd_veiculos=int(row['Qtd']),
                     valor_medio=float(row['ValorMedio']), criado_por=usuario_logado
                 ))
-            db.add_all(objs) # mais rápido e seguro
-        
+            db.add_all(objs)
+
         db.commit()
         st.success(f"{len(df)} registros salvos com sucesso!")
-        
+
     except Exception as e:
         db.rollback()
         st.error(f"Erro ao salvar: {e}")
         st.write("DataFrame que deu erro:")
-        st.dataframe(df) # mostra qual linha tá ruim
+        st.dataframe(df)
     finally:
         db.close()
     
@@ -504,9 +509,15 @@ with tab1:
             for empresa, itens in valores_digitados.items():
                 for tipo, valor_str in itens.items():
                     valor = converter_valor_br(valor_str)
-                    qtd = valores_qtd_digitados[empresa].get(tipo, 0)
-                    valor_medio = valor / qtd if qtd > 0 else 0.0
-                    dados.append({'Tipo de Título': tipo, 'Empresa': empresa, 'Saldo': valor, 'Qtd': qtd, 'ValorMedio': valor_medio})
+                    qtd = int(valores_qtd_digitados[empresa].get(tipo, 0)) # força int
+                    valor_medio = float(valor / qtd) if qtd > 0 else 0.0 # força float
+                    dados.append({
+                        'Tipo de Título': tipo,
+                        'Empresa': empresa,
+                        'Saldo': float(valor),
+                        'Qtd': qtd,
+                        'ValorMedio': valor_medio
+                    })
             return pd.DataFrame(dados)
         
         col_m, col_ws, col_e = st.columns(3)
@@ -543,8 +554,13 @@ with tab1:
                 lista_df = [df for df in lista_df if not df.empty]
                 if lista_df:
                     df = pd.concat(lista_df, ignore_index=True)
+                    
+                    # BLINDAGEM TOTAL - CRIA AS 3 COLUNAS SEMPRE
                     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
-                    df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0)
+                    df['Qtd'] = pd.to_numeric(df.get('Qtd', 0), errors='coerce').fillna(0).astype(int)
+                    df['ValorMedio'] = pd.to_numeric(df.get('ValorMedio', 0.0), errors='coerce').fillna(0.0)
+                    df['ValorMedio'] = df['ValorMedio'].replace([np.inf, -np.inf], 0.0)
+                    
                     empresas = df['Empresa'].unique()
                     novas_linhas = []
                     for emp in empresas:
@@ -552,14 +568,15 @@ with tab1:
                         adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTOS')]['Saldo'].sum()
                         if trans > 0:
                             dif = adiant - trans
-                            if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
+                            if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': float(dif), 'Qtd': 0, 'ValorMedio': 0.0})
                     if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-                    salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo') # <- DATE
+                    
+                    salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
                     st.session_state['df_final'] = df
                     st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} ATUALIZADOS no banco!")
             else:
                 df_manual = carregar_manuais(valores_digitados, valores_qtd_digitados)
-                salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO_DATE, modo='manutencao') # <- CORRIGIDO AQUI
+                salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO_DATE, modo='manutencao')
                 if 'df_carregado_manut' in st.session_state:
                     del st.session_state['df_carregado_manut']
                 st.success(f"Manutenção salva! Data: {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}")
