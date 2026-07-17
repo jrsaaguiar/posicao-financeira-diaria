@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Boolean # <- Boolean aqui
+from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
 
@@ -18,12 +18,13 @@ class PosicaoDiaria(Base):
     qtd_veiculos = Column(Integer, default=0)
     valor_medio = Column(Float, default=0.0)
 
-class Usuarios(Base): # <- Classe SÓ aqui
+class Usuarios(Base):
     __tablename__ = 'usuarios'
     id = Column(Integer, primary_key=True)
     email = Column(String(100), unique=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
     nome = Column(String(100))
+    perfil = Column(String(20), default="Usuario") # <- Admin ou Usuario
     ativo = Column(Boolean, default=True)
     
 def init_db():
