@@ -44,8 +44,23 @@ if not st.session_state['logado']:
 
 # SIDEBAR
 st.sidebar.success(f"Logado: {st.session_state['usuario']}")
+st.sidebar.write(f"Email: {st.session_state['email']}")
+
+# Pega o perfil do usuário do banco
+db = SessionLocal()
+user_db = db.query(Usuarios).filter_by(email=st.session_state['email']).first()
+st.session_state['perfil'] = user_db.perfil if user_db else "Usuario"
+db.close()
+
+st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
+
+# <- COLA AQUI: Só aparece se for Admin
+if st.session_state['perfil'] == 'Admin':
+    with st.sidebar.expander("⚙️ Gerenciar Usuários"):
+        tela_cadastro_usuario()
+
 if st.sidebar.button("Sair"):
-    for key in ['logado', 'usuario', 'email']:
+    for key in ['logado', 'usuario', 'email', 'perfil']:
         st.session_state.pop(key, None)
     st.rerun()
 st.title("Dashboard Financeira Diária")
