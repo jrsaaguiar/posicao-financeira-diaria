@@ -104,7 +104,7 @@ def detectar_empresa(nome):
     if 'WS' in nome: return 'WS'
     if 'EUSEBIO' in nome: return 'EUSEBIO'
     return 'OUTROS'
-#-------
+
 @st.cache_data
 def get_total_empresa(data, empresa):
     """Calcula o total líquido da empresa na data"""
@@ -229,7 +229,7 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     if 'Qtd' not in df.columns: df['Qtd'] = 0
     if 'ValorMedio' not in df.columns: df['ValorMedio'] = 0.0
 
-    # 2. LIMPEZA EXTREMA - TIRA NaN, inf, string vazia
+    # 2. LIMPEZA EXTREMA
     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
     df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
     df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
@@ -242,7 +242,6 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     df = df[(df['Empresa']!= '') & (df['Empresa']!= 'nan') & (df['Empresa']!= 'None')]
     df = df[(df['Tipo de Título']!= '') & (df['Tipo de Título']!= 'nan') & (df['Tipo de Título']!= 'None')]
 
-    # 4. Garante que data_ref é objeto date
     if isinstance(data_ref, str):
         data_ref = date.fromisoformat(data_ref)
 
@@ -270,7 +269,7 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                         valor=float(row['Saldo']), qtd_veiculos=int(row['Qtd']),
                         valor_medio=float(row['ValorMedio']), criado_por=usuario_logado
                     ))
-        else: # modo novo
+        else:
             db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
             objs = []
             for _, row in df.iterrows():
@@ -282,6 +281,10 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
             db.add_all(objs)
 
         db.commit()
+        
+        # <- ADICIONA ESSA LINHA AQUI: Limpa o cache pra forçar recalcular os cards
+        st.cache_data.clear() 
+        
         st.success(f"{len(df)} registros salvos com sucesso!")
 
     except Exception as e:
