@@ -62,7 +62,7 @@ if st.session_state['logado']:
     
     st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
-    # <- COLA AQUI: Só aparece se for Admin 
+    # <- COLA AQUI: Só aparece se for Admin
     if st.session_state['perfil'] == 'Admin':
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             # 1. LISTA DE USUÁRIOS
@@ -134,38 +134,19 @@ if st.session_state['logado']:
                     novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo)
                     db.add(novo)
                     msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
-                
-                db.commit() # <- tudo no mesmo nível do if
-                st.success(msg) # <- aqui estava o erro de indentação
-                db.close()
-                st.rerun()
-            db.close()
     
-            # TROCAR SENHA
-            if btn_senha and user_edit:
-                nova_senha = gerar_senha_aleatoria() # <- CORRIGE NameError
-                user_edit.senha_hash = gerar_hash(nova_senha)
                 db.commit()
-                st.success(f"Senha resetada! Nova senha: `{nova_senha}`")
+                st.success(msg)
                 db.close()
                 st.rerun()
-    
-            # ATIVAR / DESATIVAR
-            if btn_toggle and user_edit:
-                user_edit.ativo = not user_edit.ativo
-                status = "Ativado" if user_edit.ativo else "Desativado"
-                db.commit()
-                st.warning(f"Usuário {status}")
-                db.close()
-                st.rerun()
-    
-            db.close()
+            else:
+                db.close() # <- só fecha aqui se não deu rerun
     
             # 4. CADASTRO RÁPIDO - se não selecionou ninguém
             if not selected_id:
                 st.divider()
                 st.markdown("#### Cadastrar Novo")
-                tela_cadastro_usuario() # sua função antiga  
+                tela_cadastro_usuario() # sua função antiga 
                 
 st.title("Dashboard Financeira Diária")
 st.markdown("""
