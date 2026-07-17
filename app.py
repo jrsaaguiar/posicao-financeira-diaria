@@ -18,6 +18,9 @@ def gerar_hash(senha):
 def gerar_senha_aleatoria(tamanho=8):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(tamanho))
 
+def formatar_br(valor): # <- SUBI PRA CIMA
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 
 st.set_page_config(layout="wide", page_title="Posição Financeira Diária")
@@ -150,7 +153,6 @@ st.markdown("""<style>[data-testid="stMetricValue"] {font-size: 20px!important;d
 
 tab1, tab2 = st.tabs(["Lançamento", "Histórico"])
 
-def formatar_br(valor): return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 def converter_valor_br(valor):
     if pd.isna(valor): return 0.0
     val = str(valor).strip()
@@ -241,19 +243,16 @@ def zerar_banco():
     db = SessionLocal(); qtd = db.query(PosicaoDiaria).count(); db.query(PosicaoDiaria).delete(); db.commit(); db.close(); return qtd
 
 def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo_str):
-    # sua funcao de gerar excel aqui... mantem igual
     return BytesIO().getvalue()
 
 # ========== ABA 1: LANÇAMENTO ==========
 with tab1:
     st.markdown("### Lançamento e Manutenção")
-
     col_up, col_manut = st.columns([1,2])
     with col_up:
         st.markdown("#### 1. Upload RFN")
         uploaded_files = st.file_uploader("Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True, key="uploader_tab1")
         dfs = {file.name: pd.read_excel(file) for file in uploaded_files} if uploaded_files else {}
-
     with col_manut:
         st.markdown("#### 2. Lançamento Manual / Manutenção")
         col_cal, col_btn = st.columns([3,1])
@@ -306,82 +305,84 @@ with tab1:
         st.success("Botão de salvar clicado. Conecte sua lógica aqui.")
         st.rerun()
 
-# ========== ABA 2: HISTÓRICO ==========
-with tab2:
-    st.header("📊 Relatórios e Auditoria")
-    with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
-        if st.button("🗑️ ZERAR BANCO COMPLETO"):
-            qtd_apagada = zerar_banco()
-            st.success(f"Banco zerado! {qtd_apagada} registros apagados.")
-            st.rerun()
-            st.divider()
-            st.subheader("Gerar Relatório de Auditoria por Período")
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                data_inicio = st.date_input("Data Inicial", value=date.today() - timedelta(days=7))
-            with col2:
-                data_fim = st.date_input("Data Final", value=date.today())
-            with col3:
-                db = SessionLocal()
-                usuarios = [u[0] for u in db.query(Usuarios.email).filter(Usuarios.ativo==True).all()]
-                db.close()
-                usuario_filtro = st.selectbox("Filtrar por Usuário", ["Todos"] + usuarios)
-            
-            if st.button("📄 Gerar Relatório PDF", type="primary"):
-                db = SessionLocal()
-                query = db.query(PosicaoDiaria).filter(
-                    PosicaoDiaria.data >= data_inicio, # <- manda date direto
-                    PosicaoDiaria.data <= data_fim     # <- manda date direto
+    
+    # ========== ABA 2: HISTÓRICO ==========
+    with tab2:
+        st.header("📊 Relatórios e Auditoria")
+        with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
+            if st.button("🗑️ ZERAR BANCO COMPLETO"):
+                qtd_apagada = zerar_banco()
+                st.success(f"Banco zerado! {qtd_apagada} registros apagados.")
+                st.rerun()
+    
+        st.divider()
+        st.subheader("Gerar Relatório de Auditoria por Período")
+    
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            data_inicio = st.date_input("Data Inicial", value=date.today() - timedelta(days=7))
+        with col2:
+            data_fim = st.date_input("Data Final", value=date.today())
+        with col3:
+            db = SessionLocal()
+            usuarios = [u[0] for u in db.query(Usuarios.email).filter(Usuarios.ativo==True).all()]
+            db.close()
+            usuario_filtro = st.selectbox("Filtrar por Usuário", ["Todos"] + usuarios)
+    
+        if st.button("📄 Gerar Relatório PDF", type="primary"):
+            db = SessionLocal()
+            query = db.query(PosicaoDiaria).filter(
+                PosicaoDiaria.data >= data_inicio,
+                PosicaoDiaria.data <= data_fim
+            )
+            if usuario_filtro!= "Todos":
+                query = query.filter(PosicaoDiaria.criado_por == usuario_filtro)
+            registros = query.all()
+            db.close()
+    
+            if not registros:
+                st.warning("Nenhum dado encontrado no período.")
+            else:
+                df_rel = pd.DataFrame([{
+                    'Data': r.data, 'Empresa': r.empresa, 'Item': r.tipo_titulo,
+                    'Valor': r.valor, 'Qtd': r.qtd_veiculos, 'Lançado por': r.criado_por
+                } for r in registros])
+    
+                # Gera PDF
+                from reportlab.pdfgen import canvas
+                from reportlab.lib.pagesizes import A4
+                from reportlab.lib.units import cm
+                from reportlab.platypus import Table, TableStyle
+                from reportlab.lib import colors
+    
+                buffer = BytesIO()
+                c = canvas.Canvas(buffer, pagesize=A4)
+                width, height = A4
+    
+                c.setFont("Helvetica-Bold", 16)
+                c.drawString(2*cm, height - 2*cm, "RELATÓRIO DE AUDITORIA - POSIÇÃO FINANCEIRA")
+                c.setFont("Helvetica", 10)
+                c.drawString(2*cm, height - 2.8*cm, f"Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
+                c.drawString(2*cm, height - 3.3*cm, f"Usuário Filtro: {usuario_filtro}")
+    
+                # Resumo por empresa
+                resumo = df_rel.groupby('Empresa')['Valor'].sum().reset_index()
+                data_resumo = [['Empresa', 'Total Lançado']] + [[row['Empresa'], formatar_br(row['Valor'])] for _, row in resumo.iterrows()]
+                t_resumo = Table(data_resumo, colWidths=[6*cm, 4*cm])
+                t_resumo.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.grey), ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),('ALIGN',(0,0),(-1,-1),'CENTER'), ('GRID', (0,0), (-1,-1), 0.5, colors.black)]))
+                t_resumo.wrapOn(c, width, height)
+                t_resumo.drawOn(c, 2*cm, height - 6*cm)
+    
+                c.showPage()
+                c.save()
+                pdf_data = buffer.getvalue()
+    
+                st.success(f"{len(df_rel)} registros encontrados.")
+                st.dataframe(df_rel, use_container_width=True, hide_index=True)
+    
+                st.download_button(
+                    label="⬇️ Baixar Relatório PDF",
+                    data=pdf_data,
+                    file_name=f"Relatorio_Auditoria_{data_inicio}_{data_fim}.pdf",
+                    mime="application/pdf"
                 )
-                if usuario_filtro!= "Todos":
-                    query = query.filter(PosicaoDiaria.criado_por == usuario_filtro)
-                registros = query.all()
-                db.close()
-        
-                if not registros:
-                    st.warning("Nenhum dado encontrado no período.")
-                else:
-                    df_rel = pd.DataFrame([{
-                        'Data': r.data, 'Empresa': r.empresa, 'Item': r.tipo_titulo, 
-                        'Valor': r.valor, 'Qtd': r.qtd_veiculos, 'Lançado por': r.criado_por
-                    } for r in registros])
-        
-                    # Gera PDF
-                    from reportlab.pdfgen import canvas
-                    from reportlab.lib.pagesizes import A4
-                    from reportlab.lib.units import cm
-                    from reportlab.platypus import Table, TableStyle
-                    from reportlab.lib import colors
-        
-                    buffer = BytesIO()
-                    c = canvas.Canvas(buffer, pagesize=A4)
-                    width, height = A4
-        
-                    c.setFont("Helvetica-Bold", 16)
-                    c.drawString(2*cm, height - 2*cm, "RELATÓRIO DE AUDITORIA - POSIÇÃO FINANCEIRA")
-                    c.setFont("Helvetica", 10)
-                    c.drawString(2*cm, height - 2.8*cm, f"Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
-                    c.drawString(2*cm, height - 3.3*cm, f"Usuário Filtro: {usuario_filtro}")
-        
-                    # Resumo por empresa
-                    resumo = df_rel.groupby('Empresa')['Valor'].sum().reset_index()
-                    data_resumo = [['Empresa', 'Total Lançado']] + [[row['Empresa'], formatar_br(row['Valor'])] for _, row in resumo.iterrows()]
-                    t_resumo = Table(data_resumo, colWidths=[6*cm, 4*cm])
-                    t_resumo.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.grey), ('TEXTCOLOR',(0,0),(-1,0),colors.whitesmoke),('ALIGN',(0,0),(-1,-1),'CENTER'), ('GRID', (0,0), (-1,-1), 0.5, colors.black)]))
-                    t_resumo.wrapOn(c, width, height)
-                    t_resumo.drawOn(c, 2*cm, height - 6*cm)
-        
-                    c.showPage()
-                    c.save()
-                    pdf_data = buffer.getvalue()
-        
-                    st.success(f"{len(df_rel)} registros encontrados.")
-                    st.dataframe(df_rel, use_container_width=True, hide_index=True)
-        
-                    st.download_button(
-                        label="⬇️ Baixar Relatório PDF",
-                        data=pdf_data,
-                        file_name=f"Relatorio_Auditoria_{data_inicio}_{data_fim}.pdf",
-                        mime="application/pdf"
-                    )
