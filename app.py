@@ -611,8 +611,8 @@ with tab1:
             if st.button("📄 Gerar Relatório PDF", type="primary"):
                 db = SessionLocal()
                 query = db.query(PosicaoDiaria).filter(
-                    PosicaoDiaria.data >= data_inicio.strftime("%Y-%m-%d"),
-                    PosicaoDiaria.data <= data_fim.strftime("%Y-%m-%d")
+                    PosicaoDiaria.data >= data_inicio, # <- manda date direto
+                    PosicaoDiaria.data <= data_fim     # <- manda date direto
                 )
                 if usuario_filtro!= "Todos":
                     query = query.filter(PosicaoDiaria.criado_por == usuario_filtro)
