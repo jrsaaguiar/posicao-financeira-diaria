@@ -223,11 +223,14 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
     usuario_logado = st.session_state.get('email', 'sistema')
     
-    # LIMPEZA ANTI-ERRO
+    # FORÇA LIMPEZA TOTAL ANTES DE SALVAR
+    df = df.copy()
     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
     df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
     df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
     df['ValorMedio'] = df['ValorMedio'].replace([np.inf, -np.inf], 0.0)
+    df['Empresa'] = df['Empresa'].astype(str)
+    df['Tipo de Título'] = df['Tipo de Título'].astype(str)
     
     # Garante que data_ref é objeto date
     if isinstance(data_ref, str):
