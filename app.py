@@ -6,6 +6,7 @@ import openpyxl
 from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria, Usuarios # <- só importa
 import hashlib
+from auth import verificar_login, tela_cadastro_usuario
 
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
