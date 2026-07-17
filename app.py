@@ -554,8 +554,8 @@ with tab1:
         if 'df_final' in st.session_state:
             df = st.session_state['df_final']
             with st.sidebar:
-                excel_data = gerar_excel(df, empresas_selecionadas, DATA_REF)
-                st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{DATA_REF.replace('-', '')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                excel_data = gerar_excel(df, empresas_selecionadas, DATA_REF_DATE.strftime("%Y-%m-%d"))
+                st.download_button(label="📊 Gerar Planilha Única", data=excel_data, file_name=f"Posicao_Financeira_{DATA_REF_DATE.strftime('%Y%m%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             col1, col2, col3 = st.columns(3)
             empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
             for emp, col in empresas_cols.items():
