@@ -302,8 +302,29 @@ with tab1:
                     valores_qtd_digitados[emp][item_chave] = st.number_input("Qtd", value=int(valores_qtd_iniciais[emp][item_chave]), key=key_qtd, min_value=0, step=1)
 
     if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
-        st.success("Botão de salvar clicado. Conecte sua lógica aqui.")
-        st.rerun()
+    
+    # 1. Pega os valores digitados na tela e monta o DF
+    linhas = []
+    for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
+        for item_chave, item_nome in ITENS_MANUAIS:
+            valor_str = valores_digitados[emp][item_chave]
+            valor_float = converter_valor_br(valor_str)
+            qtd = valores_qtd_digitados[emp].get(item_chave, 0) if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS'] else 0
+            valor_medio = valor_float / qtd if qtd > 0 else 0.0
+            
+            linhas.append({
+                'Empresa': emp,
+                'Tipo de Título': item_chave,
+                'Saldo': valor_float,
+                'Qtd': qtd,
+                'ValorMedio': valor_medio
+            })
+    
+    df_para_salvar = pd.DataFrame(linhas)
+    
+    # 2. Chama a função que já salva no banco
+    salvar_posicao_no_banco(df_para_salvar, DATA_MANUTENCAO_DATE, modo='manutencao')
+    st.rerun()
 
 # ========== ABA 2: HISTÓRICO ==========
 with tab2:
