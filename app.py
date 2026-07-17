@@ -390,7 +390,7 @@ with tab1:
             st.markdown("<br>", unsafe_allow_html=True)
             if st.button("📂 Carregar Dados da Data", key="btn_carregar_manut"):
                 db = SessionLocal()
-                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == DATA_MANUTENCAO).all()
+                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == DATA_MANUTENCAO_DATE).all()
                 db.close()
                 if registros:
                     dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'ValorMedio': r.valor_medio} for r in registros]
