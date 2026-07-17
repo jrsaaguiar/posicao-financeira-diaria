@@ -30,6 +30,7 @@ def tela_login():
                 st.session_state['logado'] = True
                 st.session_state['usuario'] = user.nome
                 st.session_state['email'] = user.email
+                st.session_state['perfil'] = user.perfil # <- ADICIONA ESSA
                 st.rerun()
             else:
                 st.error("Email ou senha inválidos")
@@ -43,8 +44,8 @@ if not st.session_state['logado']:
     st.stop() # para tudo aqui se não logou
 
 # SIDEBAR
-st.sidebar.success(f"Logado: {st.session_state['usuario']}")
-st.sidebar.write(f"Email: {st.session_state['email']}")
+#st.sidebar.success(f"Logado: {st.session_state['usuario']}")
+st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
 # Pega o perfil do usuário do banco
 db = SessionLocal()
