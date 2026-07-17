@@ -88,7 +88,7 @@ tab1, tab2 = st.tabs(["Lançamento", "Histórico"])
 
 def formatar_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-
+# Converter Valor
 def converter_valor_br(valor):
     if pd.isna(valor): return 0.0
     val = str(valor).strip()
