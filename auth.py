@@ -35,12 +35,23 @@ def tela_cadastro_usuario():
         return
     
     st.subheader("Cadastrar Novo Usuário")
-    with st.form("form_cadastro"):
-        nome = st.text_input("Nome")
-        email = st.text_input("Email")
-        senha = st.text_input("Senha", type="password")
-        perfil = st.selectbox("Perfil", ["Usuario", "Admin"])
-        if st.form_submit_button("Cadastrar"):
-            ok, msg = criar_usuario(nome, email, senha, perfil)
-            if ok: st.success(msg)
-            else: st.error(msg)
+    
+    # <- MUDOU AQUI: clear_on_submit=True e keys
+    with st.form("form_cadastro", clear_on_submit=True):
+        nome = st.text_input("Nome", key="cad_nome").upper()
+        email = st.text_input("Email", key="cad_email").lower()
+        senha = st.text_input("Senha", type="password", key="cad_senha")
+        perfil = st.selectbox("Perfil", ["Usuario", "Admin"], key="cad_perfil")
+        
+        submitted = st.form_submit_button("Cadastrar")
+        
+        if submitted:
+            if not nome or not email or not senha:
+                st.error("Preencha todos os campos")
+            else:
+                ok, msg = criar_usuario(nome, email, senha, perfil)
+                if ok: 
+                    st.success(msg)
+                    st.rerun() # <- MUDOU AQUI: recarrega e limpa a tela
+                else: 
+                    st.error(msg)
