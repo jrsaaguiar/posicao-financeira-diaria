@@ -7,6 +7,7 @@ from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria, Usuarios # <- só importa
 import hashlib
 from auth import verificar_login, tela_cadastro_usuario
+import numpy as np
 
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
@@ -205,10 +206,20 @@ def carregar_valores_manuais_do_banco(data_ref):
             valores_qtd[reg.empresa][reg.tipo_titulo] = int(reg.qtd_veiculos or 0) # <- GARANTE INT
     db.close()
     return valores, valores_qtd
-
+# Salvar posicao no banco de dados 
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
-    usuario_logado = st.session_state.get('email', 'sistema') # <- pega quem tá logado
+    usuario_logado = st.session_state.get('email', 'sistema')
+    
+    # LIMPEZA ANTI-ERRO
+    df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
+    df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
+    df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
+    df['ValorMedio'] = df['ValorMedio'].replace([np.inf, -np.inf], 0.0)
+    
+    # Garante que data_ref é objeto date
+    if isinstance(data_ref, str):
+        data_ref = date.fromisoformat(data_ref)
     
     if modo == 'manutencao':
         for _, row in df.iterrows():
@@ -218,34 +229,32 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                 PosicaoDiaria.tipo_titulo == row['Tipo de Título']
             ).first()
             if reg:
-                reg.valor = row['Saldo']
-                reg.qtd_veiculos = row.get('Qtd', 0)
-                reg.valor_medio = row.get('ValorMedio', 0.0)
-                reg.criado_por = usuario_logado # <- ATUALIZA QUEM EDITOU
+                reg.valor = float(row['Saldo'])
+                reg.qtd_veiculos = int(row.get('Qtd', 0))
+                reg.valor_medio = float(row.get('ValorMedio', 0.0))
+                reg.criado_por = usuario_logado
             else:
                 novo = PosicaoDiaria(
                     data=data_ref,
                     empresa=row['Empresa'],
                     tipo_titulo=row['Tipo de Título'],
-                    valor=row['Saldo'],
-                    qtd_veiculos=row.get('Qtd', 0),
-                    valor_medio=row.get('ValorMedio', 0.0),
-                    criado_por=usuario_logado # <- GRAVA QUEM CRIOU
+                    valor=float(row['Saldo']),
+                    qtd_veiculos=int(row.get('Qtd', 0)),
+                    valor_medio=float(row.get('ValorMedio', 0.0)),
+                    criado_por=usuario_logado
                 )
                 db.add(novo)
     else:
         db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
         for _, row in df.iterrows():
-            qtd = row.get('Qtd', 0)
-            valor_medio = row.get('ValorMedio', 0.0)
             novo = PosicaoDiaria(
                 data=data_ref,
                 empresa=row['Empresa'],
                 tipo_titulo=row['Tipo de Título'],
-                valor=row['Saldo'],
-                qtd_veiculos=qtd,
-                valor_medio=valor_medio,
-                criado_por=usuario_logado # <- GRAVA QUEM CRIOU
+                valor=float(row['Saldo']),
+                qtd_veiculos=int(row.get('Qtd', 0)),
+                valor_medio=float(row.get('ValorMedio', 0.0)),
+                criado_por=usuario_logado
             )
             db.add(novo)
     db.commit()
@@ -519,12 +528,14 @@ with tab1:
                             dif = adiant - trans
                             if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
                     if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-                    salvar_posicao_no_banco(df, DATA_MANUTENCAO, modo='novo')
+                    salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
+                    #salvar_posicao_no_banco(df, DATA_MANUTENCAO, modo='novo')
                     st.session_state['df_final'] = df
                     st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} ATUALIZADOS no banco!")
             else:
                 df_manual = carregar_manuais(valores_digitados, valores_qtd_digitados)
-                salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO, modo='manutencao')
+                #salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO, modo='manutencao')
+                salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
                 if 'df_carregado_manut' in st.session_state:
                     del st.session_state['df_carregado_manut']
                 st.success(f"Manutenção salva! Data: {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}")
