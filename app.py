@@ -391,6 +391,8 @@ with tab1:
         col_m, col_ws, col_e = st.columns(3)
         empresas_cards = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
         
+        from sqlalchemy import func # <- COLOQUEI O IMPORT AQUI DENTRO
+        
         # CACHE CURTO PRA FORÇAR ATUALIZAR
         @st.cache_data(ttl=10)
         def get_total_empresa(data, empresa):
@@ -422,12 +424,11 @@ with tab1:
         
                 # SETA PRA CIMA OU PRA BAIXO
                 delta_cor = "normal"
-                if variacao > 0: delta_cor = "normal"
-                elif variacao < 0: delta_cor = "inverse"
+                if variacao < 0: delta_cor = "inverse"
         
                 st.metric(
                     label=f"TOTAL {emp}",
-                    value=formatar_br(total_hoje), # <- TROQUEI PRA BR COMPLETO
+                    value=formatar_br(total_hoje),
                     delta=f"{variacao:.2f}%" if variacao is not None else None,
                     delta_color=delta_cor
                 )
@@ -454,7 +455,8 @@ with tab1:
                     st.rerun()
         
             valores_iniciais, valores_qtd_iniciais = carregar_valores_manuais_do_banco(DATA_MANUTENCAO)
-
+        
+            
         if 'df_carregado_manut' in st.session_state and not st.session_state['df_carregado_manut'].empty:
             df_temp = st.session_state['df_carregado_manut']
             for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
