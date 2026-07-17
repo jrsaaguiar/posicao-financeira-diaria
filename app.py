@@ -620,6 +620,7 @@ with tab1:
                                 "VALORES": st.column_config.TextColumn("VALORES")
                             })
                     
+                    
                     # <- NOVA TABELA DE AUDITORIA
                     st.divider()
                     st.subheader("📋 Auditoria de Lançamentos")
