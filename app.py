@@ -223,57 +223,69 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
     usuario_logado = st.session_state.get('email', 'sistema')
     
-    # FORÇA LIMPEZA TOTAL ANTES DE SALVAR
     df = df.copy()
+    
+    # 1. LIMPEZA EXTREMA
     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
     df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
     df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
     df['ValorMedio'] = df['ValorMedio'].replace([np.inf, -np.inf], 0.0)
-    df['Empresa'] = df['Empresa'].astype(str)
-    df['Tipo de Título'] = df['Tipo de Título'].astype(str)
     
-    # Garante que data_ref é objeto date
+    # 2. TIRA LINHAS VAZIAS - ISSO AQUI QUE ESTAVA QUEBRANDO
+    df['Empresa'] = df['Empresa'].astype(str).str.strip()
+    df['Tipo de Título'] = df['Tipo de Título'].astype(str).str.strip()
+    df = df[(df['Empresa'] != '') & (df['Empresa'] != 'nan')]
+    df = df[(df['Tipo de Título'] != '') & (df['Tipo de Título'] != 'nan')]
+    
+    # 3. Garante que data_ref é objeto date
     if isinstance(data_ref, str):
         data_ref = date.fromisoformat(data_ref)
     
-    if modo == 'manutencao':
-        for _, row in df.iterrows():
-            reg = db.query(PosicaoDiaria).filter(
-                PosicaoDiaria.data == data_ref,
-                PosicaoDiaria.empresa == row['Empresa'],
-                PosicaoDiaria.tipo_titulo == row['Tipo de Título']
-            ).first()
-            if reg:
-                reg.valor = float(row['Saldo'])
-                reg.qtd_veiculos = int(row.get('Qtd', 0))
-                reg.valor_medio = float(row.get('ValorMedio', 0.0))
-                reg.criado_por = usuario_logado
-            else:
-                novo = PosicaoDiaria(
-                    data=data_ref,
-                    empresa=row['Empresa'],
-                    tipo_titulo=row['Tipo de Título'],
-                    valor=float(row['Saldo']),
-                    qtd_veiculos=int(row.get('Qtd', 0)),
-                    valor_medio=float(row.get('ValorMedio', 0.0)),
-                    criado_por=usuario_logado
-                )
-                db.add(novo)
-    else:
-        db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
-        for _, row in df.iterrows():
-            novo = PosicaoDiaria(
-                data=data_ref,
-                empresa=row['Empresa'],
-                tipo_titulo=row['Tipo de Título'],
-                valor=float(row['Saldo']),
-                qtd_veiculos=int(row.get('Qtd', 0)),
-                valor_medio=float(row.get('ValorMedio', 0.0)),
-                criado_por=usuario_logado
-            )
-            db.add(novo)
-    db.commit()
-    db.close()
+    if df.empty:
+        st.warning("Nenhuma linha válida para salvar")
+        db.close()
+        return
+    
+    try:
+        if modo == 'manutencao':
+            for _, row in df.iterrows():
+                reg = db.query(PosicaoDiaria).filter(
+                    PosicaoDiaria.data == data_ref,
+                    PosicaoDiaria.empresa == row['Empresa'],
+                    PosicaoDiaria.tipo_titulo == row['Tipo de Título']
+                ).first()
+                if reg:
+                    reg.valor = float(row['Saldo'])
+                    reg.qtd_veiculos = int(row['Qtd'])
+                    reg.valor_medio = float(row['ValorMedio'])
+                    reg.criado_por = usuario_logado
+                else:
+                    db.add(PosicaoDiaria(
+                        data=data_ref, empresa=row['Empresa'], tipo_titulo=row['Tipo de Título'],
+                        valor=float(row['Saldo']), qtd_veiculos=int(row['Qtd']),
+                        valor_medio=float(row['ValorMedio']), criado_por=usuario_logado
+                    ))
+        else:
+            db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
+            objs = []
+            for _, row in df.iterrows():
+                objs.append(PosicaoDiaria(
+                    data=data_ref, empresa=row['Empresa'], tipo_titulo=row['Tipo de Título'],
+                    valor=float(row['Saldo']), qtd_veiculos=int(row['Qtd']),
+                    valor_medio=float(row['ValorMedio']), criado_por=usuario_logado
+                ))
+            db.add_all(objs) # mais rápido e seguro
+        
+        db.commit()
+        st.success(f"{len(df)} registros salvos com sucesso!")
+        
+    except Exception as e:
+        db.rollback()
+        st.error(f"Erro ao salvar: {e}")
+        st.write("DataFrame que deu erro:")
+        st.dataframe(df) # mostra qual linha tá ruim
+    finally:
+        db.close()
     
 def zerar_banco():
     db = SessionLocal()
