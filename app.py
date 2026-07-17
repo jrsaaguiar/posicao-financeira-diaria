@@ -55,24 +55,26 @@ if st.session_state['logado']:
     st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
     # <- COLA AQUI: Só aparece se for Admin
+    
     if st.session_state['perfil'] == 'Admin':
-        with st.sidebar.expander("👥 Gerenciar Usuários"): # <- CERTO
+        with st.sidebar.expander("👥 Gerenciar Usuários"):
             # 1. LISTA DE USUÁRIOS
             st.markdown("#### Usuários Cadastrados")
             db = SessionLocal()
             users = db.query(Usuarios).order_by(Usuarios.id.desc()).all()
             db.close()
-        
+    
+            selected_id = None
             if users:
                 df_users = pd.DataFrame([{
                     'ID': u.id,
                     'Nome': u.nome,
                     'Email': u.email,
                     'Perfil': u.perfil,
-                    'Ativo': u.ativo
+                    'Ativo': 'Sim' if u.ativo else 'Não' # <- fica mais legível
                 } for u in users])
-        
-                # <- NOVO: Deixa selecionar a linha
+    
+                # <- Deixa selecionar a linha
                 selected = st.dataframe(
                     df_users,
                     use_container_width=True,
@@ -81,63 +83,64 @@ if st.session_state['logado']:
                     on_select="rerun",
                     selection_mode="single-row"
                 )
-        
-                selected_id = None
+    
                 if selected['selection']['rows']:
                     idx = selected['selection']['rows'][0]
-                    selected_id = df_users.iloc[idx]['ID']
+                    selected_id = int(df_users.iloc[idx]['ID']) # <- CORREÇÃO PRINCIPAL AQUI
             else:
                 st.warning("Nenhum usuário cadastrado")
-                selected_id = None
-        
+    
             st.divider()
-        
+    
             # 2. FORM DE EDIÇÃO / CADASTRO
             st.markdown("#### Dados do Usuário")
-        
+    
             # Se selecionou, carrega os dados. Se não, fica vazio pra cadastrar
             user_edit = None
             if selected_id:
                 db = SessionLocal()
                 user_edit = db.query(Usuarios).filter(Usuarios.id == selected_id).first()
                 db.close()
-        
+    
             with st.form("form_usuario", clear_on_submit=False):
                 nome = st.text_input("Nome", value=user_edit.nome if user_edit else "")
-                email = st.text_input("Email", value=user_edit.email if user_edit else "")
+                email = st.text_input("Email", value=user_edit.email if user_edit else "", disabled=bool(user_edit)) # <- trava email na edição
                 perfil = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if not user_edit or user_edit.perfil=="Usuario" else 1)
                 ativo = st.checkbox("Ativo", value=user_edit.ativo if user_edit else True)
-        
+    
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    btn_salvar = st.form_submit_button("💾 Salvar")
+                    btn_salvar = st.form_submit_button("💾 Salvar", use_container_width=True)
                 with col2:
-                    btn_senha = st.form_submit_button("🔑 Nova Senha")
+                    btn_senha = st.form_submit_button("🔑 Nova Senha", use_container_width=True)
                 with col3:
-                    btn_excluir = st.form_submit_button("🗑️ Desativar" if user_edit and user_edit.ativo else "✅ Ativar")
-        
+                    btn_excluir = st.form_submit_button("🗑️ Desativar" if user_edit and user_edit.ativo else "✅ Ativar", use_container_width=True)
+    
             # 3. LÓGICA DOS BOTÕES
             db = SessionLocal()
-        
+    
             # CADASTRAR OU EDITAR
             if btn_salvar:
                 if user_edit: # EDITAR
                     user_edit.nome = nome
-                    user_edit.email = email
                     user_edit.perfil = perfil
                     user_edit.ativo = ativo
                     msg = "Usuário atualizado!"
                 else: # CADASTRAR
+                    if db.query(Usuarios).filter_by(email=email).first(): # <- evita email duplicado
+                        st.error("Erro: Este email já está cadastrado")
+                        db.close()
+                        st.stop()
                     senha_temp = "123456" # Senha padrão
                     novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo)
                     db.add(novo)
                     msg = f"Usuário cadastrado! Senha padrão: {senha_temp}"
-        
+    
                 db.commit()
                 st.success(msg)
                 db.close()
                 st.rerun()
-        
+    
             # TROCAR SENHA
             if btn_senha and user_edit:
                 nova_senha = "123456" # ou gera aleatória
@@ -146,7 +149,7 @@ if st.session_state['logado']:
                 st.success(f"Senha resetada! Nova senha: {nova_senha}")
                 db.close()
                 st.rerun()
-        
+    
             # ATIVAR / DESATIVAR
             if btn_excluir and user_edit:
                 user_edit.ativo = not user_edit.ativo
@@ -155,15 +158,15 @@ if st.session_state['logado']:
                 st.warning(f"Usuário {status}")
                 db.close()
                 st.rerun()
-        
+    
             db.close()
-        
+    
             # 4. CADASTRO RÁPIDO - se não selecionou ninguém
             if not selected_id:
                 st.divider()
                 st.markdown("#### Cadastrar Novo")
-                tela_cadastro_usuario() # sua função antiga
-        
+                tela_cadastro_usuario() # sua função antiga  
+                
 st.title("Dashboard Financeira Diária")
 st.markdown("""
 <style>
