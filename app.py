@@ -208,6 +208,8 @@ def carregar_valores_manuais_do_banco(data_ref):
 
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
+    usuario_logado = st.session_state.get('email', 'sistema') # <- pega quem tá logado
+    
     if modo == 'manutencao':
         for _, row in df.iterrows():
             reg = db.query(PosicaoDiaria).filter(
@@ -219,6 +221,7 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                 reg.valor = row['Saldo']
                 reg.qtd_veiculos = row.get('Qtd', 0)
                 reg.valor_medio = row.get('ValorMedio', 0.0)
+                reg.criado_por = usuario_logado # <- ATUALIZA QUEM EDITOU
             else:
                 novo = PosicaoDiaria(
                     data=data_ref,
@@ -226,7 +229,8 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                     tipo_titulo=row['Tipo de Título'],
                     valor=row['Saldo'],
                     qtd_veiculos=row.get('Qtd', 0),
-                    valor_medio=row.get('ValorMedio', 0.0)
+                    valor_medio=row.get('ValorMedio', 0.0),
+                    criado_por=usuario_logado # <- GRAVA QUEM CRIOU
                 )
                 db.add(novo)
     else:
@@ -240,12 +244,13 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
                 tipo_titulo=row['Tipo de Título'],
                 valor=row['Saldo'],
                 qtd_veiculos=qtd,
-                valor_medio=valor_medio
+                valor_medio=valor_medio,
+                criado_por=usuario_logado # <- GRAVA QUEM CRIOU
             )
             db.add(novo)
     db.commit()
     db.close()
-
+    
 def zerar_banco():
     db = SessionLocal()
     qtd = db.query(PosicaoDiaria).count()
@@ -559,7 +564,7 @@ with tab1:
                         "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
                         "VALORES": st.column_config.TextColumn("VALORES")
                     })
-        
+        # ---- Tabela2 -------
         with tab2:
             st.header("Consulta de Posições Salvas")
             with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
@@ -581,9 +586,11 @@ with tab1:
                 if not registros:
                     st.warning(f"Nenhum dado encontrado para {data_consulta_date.strftime('%d/%m/%Y')}")
                 else:
-                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'Valor Medio': r.valor_medio} for r in registros]
+                    # <- AQUI ADICIONEI 'Lançado por'
+                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'Valor Medio': r.valor_medio, 'Lançado por': r.criado_por} for r in registros]
                     df_hist = pd.DataFrame(dados)
                     st.success(f"{len(df_hist)} registros encontrados para {data_consulta_date.strftime('%d/%m/%Y')}")
+                    
                     col1, col2, col3 = st.columns(3)
                     empresas_cols = {'MATRIZ': col1, 'WS': col2, 'EUSEBIO': col3}
                     for emp, col in empresas_cols.items():
@@ -612,10 +619,22 @@ with tab1:
                                 "DESCRICAO": st.column_config.TextColumn("DESCRICAO"),
                                 "VALORES": st.column_config.TextColumn("VALORES")
                             })
+                    
+                    # <- NOVA TABELA DE AUDITORIA
+                    st.divider()
+                    st.subheader("📋 Auditoria de Lançamentos")
+                    df_auditoria = df_hist[['Empresa', 'Tipo de Título', 'Saldo', 'Lançado por']].drop_duplicates().sort_values('Empresa')
+                    st.dataframe(df_auditoria, use_container_width=True, hide_index=True, column_config={
+                        "Empresa": "Empresa",
+                        "Tipo de Título": "Item",
+                        "Saldo": st.column_config.NumberColumn("Valor", format="R$ %.2f"),
+                        "Lançado por": "Lançado por"
+                    })
+        
                     excel_data_hist = gerar_excel(df_hist, ['MATRIZ', 'WS', 'EUSEBIO'], data_consulta)
                     st.download_button(
                         label=f"📊 Baixar Planilha de {data_consulta_date.strftime('%d/%m/%Y')}",
                         data=excel_data_hist,
-                file_name=f"Posicao_Financeira_{data_consulta.replace('-', '')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+                        file_name=f"Posicao_Financeira_{data_consulta.replace('-', '')}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    )
