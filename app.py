@@ -7,17 +7,16 @@ from openpyxl.utils import get_column_letter
 from database import SessionLocal, PosicaoDiaria, Usuarios
 import hashlib
 import random
-import string # <- adiciona esses 2
-from auth import verificar_login, tela_cadastro_usuario
+import string
 import numpy as np
+from auth import verificar_login, tela_cadastro_usuario
 
 def gerar_hash(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
 def gerar_senha_aleatoria(tamanho=8):
-    caracteres = string.ascii_letters + string.digits
-    return ''.join(random.choice(caracteres) for _ in range(tamanho))
-    
+    return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(tamanho))
+
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 
