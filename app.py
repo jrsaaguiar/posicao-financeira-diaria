@@ -109,9 +109,13 @@ def detectar_empresa(nome):
 @st.cache_data
 def get_total_empresa(data, empresa):
     """Calcula o total líquido da empresa na data"""
+    # Garante que data é objeto date
+    if isinstance(data, str):
+        data = date.fromisoformat(data)
+        
     db = SessionLocal()
     regs = db.query(PosicaoDiaria).filter(
-        PosicaoDiaria.data == data,
+        PosicaoDiaria.data == data, # <- agora é date
         PosicaoDiaria.empresa == empresa
     ).all()
     db.close()
@@ -185,6 +189,10 @@ ITENS_MANUAIS = [
 ]
 # Carrega Valores manuais do banco
 def carregar_valores_manuais_do_banco(data_ref):
+    # Garante que data_ref é objeto date
+    if isinstance(data_ref, str):
+        data_ref = date.fromisoformat(data_ref)
+        
     db = SessionLocal()
     valores = {
         'MATRIZ': {k: '0,00' for k,_ in ITENS_MANUAIS},
@@ -197,15 +205,16 @@ def carregar_valores_manuais_do_banco(data_ref):
         'EUSEBIO': {'NOVOS PAGOS': 0, 'USADOS PAGOS': 0}
     }
     registros = db.query(PosicaoDiaria).filter(
-        PosicaoDiaria.data == data_ref,
+        PosicaoDiaria.data == data_ref, # <- agora é date
         PosicaoDiaria.tipo_titulo.in_([k for k,_ in ITENS_MANUAIS])
     ).all()
     for reg in registros:
         valores[reg.empresa][reg.tipo_titulo] = formatar_br(reg.valor).replace('R$ ', '')
         if reg.tipo_titulo in ['NOVOS PAGOS', 'USADOS PAGOS']:
-            valores_qtd[reg.empresa][reg.tipo_titulo] = int(reg.qtd_veiculos or 0) # <- GARANTE INT
+            valores_qtd[reg.empresa][reg.tipo_titulo] = int(reg.qtd_veiculos or 0)
     db.close()
     return valores, valores_qtd
+    
 # Salvar posicao no banco de dados 
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     db = SessionLocal()
@@ -267,6 +276,7 @@ def zerar_banco():
     db.commit()
     db.close()
     return qtd
+    
 # Gerar excel exporta empresas selecionadas.
 def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo_str):
     output = BytesIO()
@@ -510,7 +520,7 @@ with tab1:
                             min_value=0,
                             step=1 # <- STEP
                         )
-        
+        # Botao salvar e atualizar
         if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
             if uploaded_files:
                 lista_df = [carregar_posicao_analitica(), carregar_obrigacoes(), carregar_creditos_nao_identificados(), carregar_adiantamentos(), carregar_manuais(valores_digitados, valores_qtd_digitados)]
@@ -528,14 +538,12 @@ with tab1:
                             dif = adiant - trans
                             if dif!= 0: novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
                     if novas_linhas: df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-                    salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
-                    #salvar_posicao_no_banco(df, DATA_MANUTENCAO, modo='novo')
+                    salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo') # <- DATE
                     st.session_state['df_final'] = df
                     st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} ATUALIZADOS no banco!")
             else:
                 df_manual = carregar_manuais(valores_digitados, valores_qtd_digitados)
-                #salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO, modo='manutencao')
-                salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
+                salvar_posicao_no_banco(df_manual, DATA_MANUTENCAO_DATE, modo='manutencao') # <- CORRIGIDO AQUI
                 if 'df_carregado_manut' in st.session_state:
                     del st.session_state['df_carregado_manut']
                 st.success(f"Manutenção salva! Data: {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}")
