@@ -18,7 +18,7 @@ def gerar_hash(senha):
 def gerar_senha_aleatoria(tamanho=8):
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(tamanho))
 
-def formatar_br(valor): # <- SUBI PRA CIMA
+def formatar_br(valor):
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
@@ -305,68 +305,7 @@ with tab1:
         st.success("Botão de salvar clicado. Conecte sua lógica aqui.")
         st.rerun()
 
-    
-    # ========== ABA 1: LANÇAMENTO ==========
-with tab1:
-    st.markdown("### Lançamento e Manutenção")
-    col_up, col_manut = st.columns([1,2])
-    with col_up:
-        st.markdown("#### 1. Upload RFN")
-        uploaded_files = st.file_uploader("Arraste os 4 arquivos RFN aqui", type=['xlsx', 'xls'], accept_multiple_files=True, key="uploader_tab1")
-        dfs = {file.name: pd.read_excel(file) for file in uploaded_files} if uploaded_files else {}
-    with col_manut:
-        st.markdown("#### 2. Lançamento Manual / Manutenção")
-        col_cal, col_btn = st.columns([3,1])
-        with col_cal:
-            DATA_MANUTENCAO_DATE = st.date_input("📅 Selecione a Data para Manutenção", value=DATA_REF_DATE, format="DD/MM/YYYY", key="data_manutencao")
-            DATA_MANUTENCAO = DATA_MANUTENCAO_DATE.strftime("%Y-%m-%d")
-        with col_btn:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📂 Carregar Dados da Data", key="btn_carregar_manut"):
-                db = SessionLocal()
-                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == DATA_MANUTENCAO_DATE).all()
-                db.close()
-                if registros:
-                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'ValorMedio': r.valor_medio} for r in registros]
-                    st.session_state['df_carregado_manut'] = pd.DataFrame(dados)
-                    st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} carregados.")
-                else:
-                    st.warning("Nenhum dado encontrado para esta data.")
-                    st.session_state['df_carregado_manut'] = pd.DataFrame()
-                st.rerun()
-
-    valores_iniciais, valores_qtd_iniciais = carregar_valores_manuais_do_banco(DATA_MANUTENCAO)
-    if 'df_carregado_manut' in st.session_state and not st.session_state['df_carregado_manut'].empty:
-        df_temp = st.session_state['df_carregado_manut']
-        for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
-            for item_chave, _ in ITENS_MANUAIS:
-                val = df_temp[(df_temp['Empresa']==emp) & (df_temp['Tipo de Título']==item_chave)]['Saldo'].sum()
-                qtd = df_temp[(df_temp['Empresa']==emp) & (df_temp['Tipo de Título']==item_chave)]['Qtd'].sum()
-                valores_iniciais[emp][item_chave] = formatar_br(val).replace('R$ ', '')
-                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                    valores_qtd_iniciais[emp][item_chave] = int(qtd)
-
-    col_m, col_ws, col_e = st.columns(3)
-    valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-    valores_qtd_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-    empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
-
-    for emp, col in empresas_col.items():
-        with col:
-            st.markdown(f"**{emp}**")
-            for item_chave, item_nome in ITENS_MANUAIS:
-                st.markdown(f"{item_nome}")
-                key_valor = f"{emp}_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
-                key_qtd = f"{emp}_QTD_{item_chave}_edit_{DATA_MANUTENCAO.replace('-', '')}"
-                valores_digitados[emp][item_chave] = st.text_input(label="", value=valores_iniciais[emp][item_chave], key=key_valor, label_visibility="collapsed")
-                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                    valores_qtd_digitados[emp][item_chave] = st.number_input("Qtd", value=int(valores_qtd_iniciais[emp][item_chave]), key=key_qtd, min_value=0, step=1)
-
-    if st.button(f"💾 Salvar / Atualizar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_salvar_manut"):
-        st.success("Botão de salvar clicado. Conecte sua lógica aqui.")
-        st.rerun()
-
-# ========== ABA 2: HISTÓRICO ========== <- RECUAR TUDO ISSO 4 ESPAÇOS PRA ESQUERDA
+# ========== ABA 2: HISTÓRICO ==========
 with tab2:
     st.header("📊 Relatórios e Auditoria")
     with st.expander("⚠️ Zona Perigosa - Apagar Dados"):
@@ -408,7 +347,6 @@ with tab2:
                 'Valor': r.valor, 'Qtd': r.qtd_veiculos, 'Lançado por': r.criado_por
             } for r in registros])
 
-            # Gera PDF
             from reportlab.pdfgen import canvas
             from reportlab.lib.pagesizes import A4
             from reportlab.lib.units import cm
@@ -425,7 +363,6 @@ with tab2:
             c.drawString(2*cm, height - 2.8*cm, f"Período: {data_inicio.strftime('%d/%m/%Y')} a {data_fim.strftime('%d/%m/%Y')}")
             c.drawString(2*cm, height - 3.3*cm, f"Usuário Filtro: {usuario_filtro}")
 
-            # Resumo por empresa
             resumo = df_rel.groupby('Empresa')['Valor'].sum().reset_index()
             data_resumo = [['Empresa', 'Total Lançado']] + [[row['Empresa'], formatar_br(row['Valor'])] for _, row in resumo.iterrows()]
             t_resumo = Table(data_resumo, colWidths=[6*cm, 4*cm])
