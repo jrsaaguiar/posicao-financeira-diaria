@@ -92,7 +92,7 @@ if st.session_state['logado']:
     
                 if selected['selection']['rows']:
                     idx = selected['selection']['rows'][0]
-                    selected_id = int(df_users.iloc[idx]['ID']) # <- CORRIGE ERRO DO POSTGRES
+                    selected_id = int(df_users.iloc[idx]['ID'])
             else:
                 st.warning("Nenhum usuário cadastrado")
     
@@ -107,48 +107,36 @@ if st.session_state['logado']:
                 user_edit = db.query(Usuarios).filter(Usuarios.id == selected_id).first()
                 db.close()
     
-            with st.form("form_usuario", clear_on_submit=False):
+            with st.form("form_usuario"):
                 nome = st.text_input("Nome", value=user_edit.nome if user_edit else "")
                 email = st.text_input("Email", value=user_edit.email if user_edit else "", disabled=bool(user_edit))
                 perfil = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if not user_edit or user_edit.perfil=="Usuario" else 1)
                 ativo = st.checkbox("Ativo", value=user_edit.ativo if user_edit else True)
     
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    btn_salvar = st.form_submit_button("💾 Salvar", use_container_width=True)
-                with col2:
-                    btn_senha = st.form_submit_button("🔑 Nova Senha", use_container_width=True)
-                with col3:
-                    # LÓGICA DO BOTÃO: muda se estiver ativo ou não
-                    if user_edit:
-                        if user_edit.ativo:
-                            btn_toggle = st.form_submit_button("🗑️ Desativar", use_container_width=True, type="primary")
-                        else:
-                            btn_toggle = st.form_submit_button("✅ Ativar", use_container_width=True, type="secondary")
-                    else:
-                        btn_toggle = st.form_submit_button("🗑️ Desativar", use_container_width=True, disabled=True)
+                col1, col2 = st.columns(2)
+                btn_salvar = col1.form_submit_button("💾 Salvar", use_container_width=True)
+                btn_senha = col2.form_submit_button("🔑 Nova Senha", use_container_width=True, disabled=True)
     
-            # 3. LÓGICA DOS BOTÕES
+            # 3. LÓGICA
             db = SessionLocal()
-    
-            # CADASTRAR OU EDITAR
             if btn_salvar:
-                if user_edit: # EDITAR
-                    user_edit.nome = nome
-                    user_edit.perfil = perfil
-                    user_edit.ativo = ativo
+                if user_edit:
+                    user_edit.nome, user_edit.perfil, user_edit.ativo = nome, perfil, ativo
                     msg = "Usuário atualizado!"
-                else: # CADASTRAR
+                else:
                     if db.query(Usuarios).filter_by(email=email).first():
                         st.error("Erro: Este email já está cadastrado")
                         db.close()
                         st.stop()
-                    senha_temp = gerar_senha_aleatoria() # <- SENHA ALEATÓRIA
+                    senha_temp = gerar_senha_aleatoria()
                     novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo)
                     db.add(novo)
                     msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
-    
                 db.commit()
+                st.success(msg)
+                db.close()
+                st.rerun()
+            db.close()
                 st.success(msg)
                 db.close()
                 st.rerun()
