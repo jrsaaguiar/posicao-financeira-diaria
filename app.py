@@ -390,42 +390,70 @@ with tab1:
         st.markdown("### Resumo do Dia")
         col_m, col_ws, col_e = st.columns(3)
         empresas_cards = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
-
+        
+        # CACHE CURTO PRA FORÇAR ATUALIZAR
+        @st.cache_data(ttl=10)
+        def get_total_empresa(data, empresa):
+            db = SessionLocal()
+            try:
+                total = db.query(func.sum(PosicaoDiaria.valor)).filter(
+                    PosicaoDiaria.data == data,
+                    PosicaoDiaria.empresa == empresa
+                ).scalar()
+                return float(total or 0.0)
+            finally:
+                db.close()
+        
+        @st.cache_data(ttl=10)
+        def get_variacao_empresa(data_atual, data_anterior, empresa):
+            if not data_anterior: return 0.0
+            total_atual = get_total_empresa(data_atual, empresa)
+            total_anterior = get_total_empresa(data_anterior, empresa)
+            if total_anterior == 0: return 0.0
+            return ((total_atual - total_anterior) / total_anterior) * 100
+        
+        
         for emp, col in empresas_cards.items():
             if emp not in empresas_selecionadas: continue
             with col:
-                total_hoje = get_total_empresa(DATA_REF_DATE, emp) # <- MANDA DATE
+                total_hoje = get_total_empresa(DATA_REF_DATE, emp)
                 data_ontem_date = DATA_REF_DATE - timedelta(days=1)
-                variacao = get_variacao_empresa(DATA_REF_DATE, data_ontem_date, emp) # <- MANDA DATE
-
+                variacao = get_variacao_empresa(DATA_REF_DATE, data_ontem_date, emp)
+        
+                # SETA PRA CIMA OU PRA BAIXO
+                delta_cor = "normal"
+                if variacao > 0: delta_cor = "normal"
+                elif variacao < 0: delta_cor = "inverse"
+        
                 st.metric(
                     label=f"TOTAL {emp}",
-                    value=formatar_compacto(total_hoje),
-                    delta=f"{variacao:.2f}%" if variacao is not None else None
+                    value=formatar_br(total_hoje), # <- TROQUEI PRA BR COMPLETO
+                    delta=f"{variacao:.2f}%" if variacao is not None else None,
+                    delta_color=delta_cor
                 )
         st.divider()
-
-    with st.expander("📝 Lançamento Manual / Manutenção - Editável", expanded=True):
-        col_cal, col_btn = st.columns([3,1])
-        with col_cal:
-            DATA_MANUTENCAO_DATE = st.date_input("📅 Selecione a Data para Manutenção", value=DATA_REF_DATE, format="DD/MM/YYYY", key="data_manutencao")
-            DATA_MANUTENCAO = DATA_MANUTENCAO_DATE.strftime("%Y-%m-%d")
-        with col_btn:
-            st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("📂 Carregar Dados da Data", key="btn_carregar_manut"):
-                db = SessionLocal()
-                registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == DATA_MANUTENCAO_DATE).all()
-                db.close()
-                if registros:
-                    dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'ValorMedio': r.valor_medio} for r in registros]
-                    st.session_state['df_carregado_manut'] = pd.DataFrame(dados)
-                    st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} carregados.")
-                else:
-                    st.warning("Nenhum dado encontrado para esta data.")
-                    st.session_state['df_carregado_manut'] = pd.DataFrame()
-                st.rerun()
-
-        valores_iniciais, valores_qtd_iniciais = carregar_valores_manuais_do_banco(DATA_MANUTENCAO)
+        
+        with st.expander("📝 Lançamento Manual / Manutenção - Editável", expanded=True):
+            col_cal, col_btn = st.columns([3,1])
+            with col_cal:
+                DATA_MANUTENCAO_DATE = st.date_input("📅 Selecione a Data para Manutenção", value=DATA_REF_DATE, format="DD/MM/YYYY", key="data_manutencao")
+                DATA_MANUTENCAO = DATA_MANUTENCAO_DATE.strftime("%Y-%m-%d")
+            with col_btn:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📂 Carregar Dados da Data", key="btn_carregar_manut"):
+                    db = SessionLocal()
+                    registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == DATA_MANUTENCAO_DATE).all()
+                    db.close()
+                    if registros:
+                        dados = [{'Tipo de Título': r.tipo_titulo, 'Empresa': r.empresa, 'Saldo': r.valor, 'Qtd': r.qtd_veiculos, 'ValorMedio': r.valor_medio} for r in registros]
+                        st.session_state['df_carregado_manut'] = pd.DataFrame(dados)
+                        st.success(f"Dados de {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')} carregados.")
+                    else:
+                        st.warning("Nenhum dado encontrado para esta data.")
+                        st.session_state['df_carregado_manut'] = pd.DataFrame()
+                    st.rerun()
+        
+            valores_iniciais, valores_qtd_iniciais = carregar_valores_manuais_do_banco(DATA_MANUTENCAO)
 
         if 'df_carregado_manut' in st.session_state and not st.session_state['df_carregado_manut'].empty:
             df_temp = st.session_state['df_carregado_manut']
