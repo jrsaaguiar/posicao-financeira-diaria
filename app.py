@@ -441,11 +441,19 @@ with tab1:
         dfs = {}
         if uploaded_files:
             dfs = {file.name: pd.read_excel(file) for file in uploaded_files}
-
+        
+        # Carrega arquivos para possição analitica
         def carregar_posicao_analitica():
             if not uploaded_files: return pd.DataFrame()
-            if 'RFN003_PosicaoAnaliticoReceber_Excel.xls' not in dfs and 'RFN003_PosicaoAnaliticoReceber_Excel.xlsx' not in dfs: return pd.DataFrame()
-            df_raw = dfs.get('RFN003_PosicaoAnaliticoReceber_Excel.xls', dfs.get('RFN003_PosicaoAnaliticoReceber_Excel.xlsx'))
+        
+            # PEGA PELO RFN003 + RECEBER
+            df_raw = None
+            for nome, df_temp in dfs.items():
+                if 'RFN003' in nome.upper() and 'RECEBER' in nome.upper():
+                    df_raw = df_temp
+                    break
+        
+            if df_raw is None: return pd.DataFrame()
             df_raw.columns = df_raw.columns.str.strip()
             dados = []
             for empresa in df_raw['Empresa'].dropna().unique():
@@ -461,11 +469,17 @@ with tab1:
                         dados.append({'Tipo de Título': tipo, 'Empresa': empresa_norm, 'Saldo': saldo})
                     except: continue
             return pd.DataFrame(dados) if dados else pd.DataFrame()
-
+                
         def carregar_obrigacoes():
             if not uploaded_files: return pd.DataFrame()
-            if 'RFN003_PosicaoAnaliticoPagar.xlsx' not in dfs: return pd.DataFrame()
-            df_obrig_raw = dfs['RFN003_PosicaoAnaliticoPagar.xlsx']
+        
+            df_obrig_raw = None
+            for nome, df_temp in dfs.items():
+                if 'RFN003' in nome.upper() and 'PAGAR' in nome.upper():
+                    df_obrig_raw = df_temp
+                    break
+        
+            if df_obrig_raw is None: return pd.DataFrame()
             obrig_dict = {'MATRIZ': 0.0, 'WS': 0.0, 'EUSEBIO': 0.0}
             for i in range(len(df_obrig_raw)):
                 linha_toda = " ".join([str(x) for x in df_obrig_raw.iloc[i] if pd.notna(x)]).upper()
@@ -480,11 +494,17 @@ with tab1:
                     break
             linhas = [{'Tipo de Título': 'OBRIG. A PAGA', 'Empresa': e, 'Saldo': v} for e,v in obrig_dict.items() if v > 0]
             return pd.DataFrame(linhas)
-
+                
         def carregar_creditos_nao_identificados():
             if not uploaded_files: return pd.DataFrame()
-            if 'RFN024_SaldoCreditosNaoIdentificados.xlsx' not in dfs: return pd.DataFrame()
-            df_cred_raw = dfs['RFN024_SaldoCreditosNaoIdentificados.xlsx']
+        
+            df_cred_raw = None
+            for nome, df_temp in dfs.items():
+                if 'RFN024' in nome.upper():
+                    df_cred_raw = df_temp
+                    break
+        
+            if df_cred_raw is None: return pd.DataFrame()
             credito_dict = {'MATRIZ': 0.0, 'WS': 0.0, 'EUSEBIO': 0.0}
             for i in range(len(df_cred_raw)):
                 if not str(df_cred_raw.iloc[i, 0]).isdigit(): continue
@@ -493,11 +513,17 @@ with tab1:
                 if emp in credito_dict and sal > 0: credito_dict[emp] += sal
             linhas = [{'Tipo de Título': 'TRANSITORIA', 'Empresa': e, 'Saldo': v} for e,v in credito_dict.items() if v > 0]
             return pd.DataFrame(linhas)
-
+                
         def carregar_adiantamentos():
             if not uploaded_files: return pd.DataFrame()
-            if 'RFN013_FichaRazaoSaldoExcel.xlsx' not in dfs and 'RFN013_FichaRazaoSaldo_Excel.xls' not in dfs: return pd.DataFrame()
-            df_ad_raw = dfs.get('RFN013_FichaRazaoSaldoExcel.xlsx', dfs.get('RFN013_FichaRazaoSaldo_Excel.xls'))
+        
+            df_ad_raw = None
+            for nome, df_temp in dfs.items():
+                if 'RFN013' in nome.upper():
+                    df_ad_raw = df_temp
+                    break
+        
+            if df_ad_raw is None: return pd.DataFrame()
             adiant_dict = {'MATRIZ': 0.0, 'WS': 0.0, 'EUSEBIO': 0.0}
             for i in range(1, len(df_ad_raw)):
                 emp = detectar_empresa(str(df_ad_raw.iloc[i, 3]))
