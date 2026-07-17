@@ -4,11 +4,20 @@ from datetime import date, timedelta
 from io import BytesIO
 import openpyxl
 from openpyxl.utils import get_column_letter
-from database import SessionLocal, PosicaoDiaria, Usuarios # <- só importa
+from database import SessionLocal, PosicaoDiaria, Usuarios
 import hashlib
+import random
+import string # <- adiciona esses 2
 from auth import verificar_login, tela_cadastro_usuario
 import numpy as np
 
+def gerar_hash(senha):
+    return hashlib.sha256(senha.encode()).hexdigest()
+
+def gerar_senha_aleatoria(tamanho=8):
+    caracteres = string.ascii_letters + string.digits
+    return ''.join(random.choice(caracteres) for _ in range(tamanho))
+    
 # Empresas
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 
@@ -54,8 +63,7 @@ if st.session_state['logado']:
     
     st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
-    # <- COLA AQUI: Só aparece se for Admin
-    
+    # <- COLA AQUI: Só aparece se for Admin 
     if st.session_state['perfil'] == 'Admin':
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             # 1. LISTA DE USUÁRIOS
@@ -71,10 +79,9 @@ if st.session_state['logado']:
                     'Nome': u.nome,
                     'Email': u.email,
                     'Perfil': u.perfil,
-                    'Ativo': 'Sim' if u.ativo else 'Não' # <- fica mais legível
+                    'Ativo': 'Sim' if u.ativo else 'Não'
                 } for u in users])
     
-                # <- Deixa selecionar a linha
                 selected = st.dataframe(
                     df_users,
                     use_container_width=True,
@@ -86,7 +93,7 @@ if st.session_state['logado']:
     
                 if selected['selection']['rows']:
                     idx = selected['selection']['rows'][0]
-                    selected_id = int(df_users.iloc[idx]['ID']) # <- CORREÇÃO PRINCIPAL AQUI
+                    selected_id = int(df_users.iloc[idx]['ID']) # <- CORRIGE ERRO DO POSTGRES
             else:
                 st.warning("Nenhum usuário cadastrado")
     
@@ -95,7 +102,6 @@ if st.session_state['logado']:
             # 2. FORM DE EDIÇÃO / CADASTRO
             st.markdown("#### Dados do Usuário")
     
-            # Se selecionou, carrega os dados. Se não, fica vazio pra cadastrar
             user_edit = None
             if selected_id:
                 db = SessionLocal()
@@ -104,7 +110,7 @@ if st.session_state['logado']:
     
             with st.form("form_usuario", clear_on_submit=False):
                 nome = st.text_input("Nome", value=user_edit.nome if user_edit else "")
-                email = st.text_input("Email", value=user_edit.email if user_edit else "", disabled=bool(user_edit)) # <- trava email na edição
+                email = st.text_input("Email", value=user_edit.email if user_edit else "", disabled=bool(user_edit))
                 perfil = st.selectbox("Perfil", ["Usuario", "Admin"], index=0 if not user_edit or user_edit.perfil=="Usuario" else 1)
                 ativo = st.checkbox("Ativo", value=user_edit.ativo if user_edit else True)
     
@@ -114,7 +120,14 @@ if st.session_state['logado']:
                 with col2:
                     btn_senha = st.form_submit_button("🔑 Nova Senha", use_container_width=True)
                 with col3:
-                    btn_excluir = st.form_submit_button("🗑️ Desativar" if user_edit and user_edit.ativo else "✅ Ativar", use_container_width=True)
+                    # LÓGICA DO BOTÃO: muda se estiver ativo ou não
+                    if user_edit:
+                        if user_edit.ativo:
+                            btn_toggle = st.form_submit_button("🗑️ Desativar", use_container_width=True, type="primary")
+                        else:
+                            btn_toggle = st.form_submit_button("✅ Ativar", use_container_width=True, type="secondary")
+                    else:
+                        btn_toggle = st.form_submit_button("🗑️ Desativar", use_container_width=True, disabled=True)
     
             # 3. LÓGICA DOS BOTÕES
             db = SessionLocal()
@@ -127,14 +140,14 @@ if st.session_state['logado']:
                     user_edit.ativo = ativo
                     msg = "Usuário atualizado!"
                 else: # CADASTRAR
-                    if db.query(Usuarios).filter_by(email=email).first(): # <- evita email duplicado
+                    if db.query(Usuarios).filter_by(email=email).first():
                         st.error("Erro: Este email já está cadastrado")
                         db.close()
                         st.stop()
-                    senha_temp = "123456" # Senha padrão
+                    senha_temp = gerar_senha_aleatoria() # <- SENHA ALEATÓRIA
                     novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo)
                     db.add(novo)
-                    msg = f"Usuário cadastrado! Senha padrão: {senha_temp}"
+                    msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
     
                 db.commit()
                 st.success(msg)
@@ -143,15 +156,15 @@ if st.session_state['logado']:
     
             # TROCAR SENHA
             if btn_senha and user_edit:
-                nova_senha = "123456" # ou gera aleatória
+                nova_senha = gerar_senha_aleatoria() # <- CORRIGE NameError
                 user_edit.senha_hash = gerar_hash(nova_senha)
                 db.commit()
-                st.success(f"Senha resetada! Nova senha: {nova_senha}")
+                st.success(f"Senha resetada! Nova senha: `{nova_senha}`")
                 db.close()
                 st.rerun()
     
             # ATIVAR / DESATIVAR
-            if btn_excluir and user_edit:
+            if btn_toggle and user_edit:
                 user_edit.ativo = not user_edit.ativo
                 status = "Ativado" if user_edit.ativo else "Desativado"
                 db.commit()
