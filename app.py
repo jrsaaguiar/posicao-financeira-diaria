@@ -56,8 +56,7 @@ if st.session_state['logado']:
 
     # <- COLA AQUI: Só aparece se for Admin
     if st.session_state['perfil'] == 'Admin':
-        wwith st.sidebar.expander("👥 Gerenciar Usuários"):
-
+        with st.sidebar.expander("👥 Gerenciar Usuários"): # <- CERTO
             # 1. LISTA DE USUÁRIOS
             st.markdown("#### Usuários Cadastrados")
             db = SessionLocal()
