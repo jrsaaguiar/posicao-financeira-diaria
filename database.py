@@ -11,13 +11,13 @@ Base = declarative_base()
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
     id = Column(Integer, primary_key=True, index=True)
-    data = Column(String)
+    data = Column(Date, index=True) # <- MUDAR DE String PARA Date
     empresa = Column(String)
     tipo_titulo = Column(String)
     valor = Column(Float)
     qtd_veiculos = Column(Integer, default=0)
     valor_medio = Column(Float, default=0.0)
-    criado_por = Column(String(100), default="sistema") # <- NOVA COLUNA
+    criado_por = Column(String(100), default="sistema")
 
 class Usuarios(Base):
     __tablename__ = 'usuarios'
