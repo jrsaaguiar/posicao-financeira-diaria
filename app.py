@@ -355,12 +355,11 @@ def gerar_excel(df_para_exportar, empresas_selecionadas, data_titulo_str):
             cell_total = worksheet.cell(row=linha_dados, column=col_inicio+1, value=total_geral); cell_total.font = bold; cell_total.alignment = right; cell_total.number_format = 'R$ #,##0.00'; cell_total.border = border_fina
             col_inicio += 3
     return output.getvalue()
-
+# cards
 with tab1:
     with st.sidebar:
         st.markdown("### Data de Referência do Lançamento")
         DATA_REF_DATE = st.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY", key="data_lancamento")
-        DATA_REF = DATA_REF_DATE.strftime("%Y-%m-%d")
 
         st.markdown("### Filtros")
         empresas_selecionadas = st.multiselect("Empresas", ['MATRIZ', 'WS', 'EUSEBIO'], default=['MATRIZ', 'WS', 'EUSEBIO'])
@@ -373,10 +372,9 @@ with tab1:
         for emp, col in empresas_cards.items():
             if emp not in empresas_selecionadas: continue
             with col:
-                total_hoje = get_total_empresa(DATA_REF, emp)
+                total_hoje = get_total_empresa(DATA_REF_DATE, emp) # <- MANDA DATE
                 data_ontem_date = DATA_REF_DATE - timedelta(days=1)
-                data_ontem = data_ontem_date.strftime("%Y-%m-%d")
-                variacao = get_variacao_empresa(DATA_REF, data_ontem, emp)
+                variacao = get_variacao_empresa(DATA_REF_DATE, data_ontem_date, emp) # <- MANDA DATE
 
                 st.metric(
                     label=f"TOTAL {emp}",
