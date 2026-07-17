@@ -17,6 +17,7 @@ class PosicaoDiaria(Base):
     valor = Column(Float)
     qtd_veiculos = Column(Integer, default=0)
     valor_medio = Column(Float, default=0.0)
+    criado_por = Column(String(100), default="sistema") # <- NOVA COLUNA
 
 class Usuarios(Base):
     __tablename__ = 'usuarios'
@@ -27,6 +28,7 @@ class Usuarios(Base):
     perfil = Column(String(20), default="Usuario") # <- Admin ou Usuario
     ativo = Column(Boolean, default=True)
     
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
