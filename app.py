@@ -120,10 +120,12 @@ if st.session_state['logado']:
             # 3. LÓGICA
             db = SessionLocal()
             if btn_salvar:
-                if user_edit:
-                    user_edit.nome, user_edit.perfil, user_edit.ativo = nome, perfil, ativo
+                if user_edit: # EDITAR
+                    user_edit.nome = nome
+                    user_edit.perfil = perfil
+                    user_edit.ativo = ativo
                     msg = "Usuário atualizado!"
-                else:
+                else: # CADASTRAR
                     if db.query(Usuarios).filter_by(email=email).first():
                         st.error("Erro: Este email já está cadastrado")
                         db.close()
@@ -132,14 +134,12 @@ if st.session_state['logado']:
                     novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo)
                     db.add(novo)
                     msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
-                db.commit()
-                st.success(msg)
+                
+                db.commit() # <- tudo no mesmo nível do if
+                st.success(msg) # <- aqui estava o erro de indentação
                 db.close()
                 st.rerun()
             db.close()
-                st.success(msg)
-                db.close()
-                st.rerun()
     
             # TROCAR SENHA
             if btn_senha and user_edit:
