@@ -30,8 +30,9 @@ def gerar_excel_dashboard(data_ref, empresas):
 
     for d in dados:
         if d.tipo_titulo in ITENS_ORDEM and d.empresa in empresas:
-            df_pivot.loc[d.tipo_titulo, d.empresa] = d.valor
-            df_qtd.loc[d.tipo_titulo, d.empresa] = d.qtd_veiculos
+            # CORREÇÃO: Conversão explicita de Decimal para float
+            df_pivot.loc[d.tipo_titulo, d.empresa] = float(d.valor or 0.0)
+            df_qtd.loc[d.tipo_titulo, d.empresa] = getattr(d, 'qtd_veiculos', 0) or 0
 
     output = BytesIO()
     nome_aba = 'POSIÇÃO ' + data_ref.strftime('%d-%m-%Y')
@@ -74,9 +75,9 @@ def gerar_excel_dashboard(data_ref, empresas):
             worksheet.cell(row=row+2, column=col_atual+1, value="VALORES").font = bold_font
 
             linha_item = row + 3
-            total_emp = 0
+            total_emp = 0.0
             for item in ITENS_ORDEM:
-                valor = df_pivot.loc[item, emp]
+                valor = float(df_pivot.loc[item, emp])
                 qtd = df_qtd.loc[item, emp]
 
                 if item in ['NOVOS PAGOS', 'USADOS PAGOS']:
