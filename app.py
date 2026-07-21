@@ -1,3 +1,4 @@
+# App.py
 import hashlib
 import random
 import string
@@ -525,7 +526,6 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
                         dados["criado_por"] = usuario_logado
                     db.add(PosicaoDiaria(**dados))
         else:
-            # Modo 'novo': apaga a data completa e recria
             db.query(PosicaoDiaria).filter(
                 PosicaoDiaria.data == data_ref
             ).delete()
@@ -561,64 +561,37 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
 
 # ========== ABA 1: LANÇAMENTO ==========
 with tab1:
-    st.header(f"Lançamento da Posição - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
+    st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
 
-    # Processamento de arquivos RFN/Sistemas
-    with st.expander("📁 Importação de Relatórios Automáticos", expanded=True):
-        col_up1, col_up2 = st.columns(2)
-        with col_up1:
-            arq_posicao = st.file_uploader(
-                "Posição Analítica", type=["xlsx", "xls", "csv"]
-            )
-            arq_obrig = st.file_uploader("Obrigações", type=["xlsx", "xls", "csv"])
-        with col_up2:
-            arq_creditos = st.file_uploader(
-                "Créditos Não Identificados", type=["xlsx", "xls", "csv"]
-            )
-            arq_adiant = st.file_uploader(
-                "Adiantamentos", type=["xlsx", "xls", "csv"]
-            )
-
-        if st.button("⚙️ Processar Arquivos Enviados"):
-            dfs_processados = []
-
-            if arq_posicao:
-                df_p = carregar_posicao_analitica(arq_posicao)
-                if df_p is not None and not df_p.empty:
-                    dfs_processados.append(df_p)
-
-            if arq_obrig:
-                df_o = carregar_obrigacoes(arq_obrig)
-                if df_o is not None and not df_o.empty:
-                    dfs_processados.append(df_o)
-
-            if arq_creditos:
-                df_c = carregar_creditos_nao_identificados(arq_creditos)
-                if df_c is not None and not df_c.empty:
-                    dfs_processados.append(df_c)
-
-            if arq_adiant:
-                df_a = carregar_adiantamentos(arq_adiant)
-                if df_a is not None and not df_a.empty:
-                    dfs_processados.append(df_a)
-
-            if dfs_processados:
-                df_final_auto = pd.concat(dfs_processados, ignore_index=True)
-                salvar_posicao_no_banco(
-                    df_final_auto, DATA_REF_DATE, modo="manutencao"
-                )
-            else:
-                st.warning("Nenhum arquivo válido foi selecionado para carregar.")
-
-    st.divider()
-
-    # Formulário Manual
-    st.subheader("📝 Lançamentos Manuais por Empresa")
     valores_existentes, qtd_existente = carregar_valores_manuais_do_banco(
         DATA_REF_DATE
     )
 
-    with st.form("form_lancamento_manual"):
+    with st.form("form_lancamento_unico"):
+        # --- Importação de Arquivos ---
+        st.subheader("📁 Importação de Relatórios Automáticos")
+        col_up1, col_up2 = st.columns(2)
+        with col_up1:
+            arq_posicao = st.file_uploader(
+                "Posição Analítica", type=["xlsx", "xls", "csv"], key="up_posicao"
+            )
+            arq_obrig = st.file_uploader(
+                "Obrigações", type=["xlsx", "xls", "csv"], key="up_obrig"
+            )
+        with col_up2:
+            arq_creditos = st.file_uploader(
+                "Créditos Não Identificados",
+                type=["xlsx", "xls", "csv"],
+                key="up_creditos",
+            )
+            arq_adiant = st.file_uploader(
+                "Adiantamentos", type=["xlsx", "xls", "csv"], key="up_adiant"
+            )
+
+        st.divider()
+
+        # --- Valores Manuais ---
+        st.subheader("📝 Lançamentos Manuais por Empresa")
         dados_manuais_form = []
 
         cols_emp = st.columns(len(empresas_selecionadas))
@@ -665,15 +638,55 @@ with tab1:
                         }
                     )
 
-        btn_salvar_manual = st.form_submit_button(
-            "💾 Salvar Lançamentos Manuais", type="primary"
+        st.divider()
+
+        # --- Botão Único de Ação ---
+        btn_salvar_tudo = st.form_submit_button(
+            "🚀 Salvar e Processar Posição Completa",
+            type="primary",
+            use_container_width=True,
         )
 
-        if btn_salvar_manual:
-            df_manuais = pd.DataFrame(dados_manuais_form)
-            salvar_posicao_no_banco(
-                df_manuais, DATA_REF_DATE, modo="manutencao"
-            )
+        if btn_salvar_tudo:
+            dfs_para_salvar = []
+
+            with st.spinner("Processando relatórios e dados manuais..."):
+                # Processar Arquivos Enviados
+                if arq_posicao:
+                    df_p = carregar_posicao_analitica(arq_posicao)
+                    if df_p is not None and not df_p.empty:
+                        dfs_para_salvar.append(df_p)
+
+                if arq_obrig:
+                    df_o = carregar_obrigacoes(arq_obrig)
+                    if df_o is not None and not df_o.empty:
+                        dfs_para_salvar.append(df_o)
+
+                if arq_creditos:
+                    df_c = carregar_creditos_nao_identificados(arq_creditos)
+                    if df_c is not None and not df_c.empty:
+                        dfs_para_salvar.append(df_c)
+
+                if arq_adiant:
+                    df_a = carregar_adiantamentos(arq_adiant)
+                    if df_a is not None and not df_a.empty:
+                        dfs_para_salvar.append(df_a)
+
+                # Adicionar Lançamentos Manuais
+                df_manuais = pd.DataFrame(dados_manuais_form)
+                if not df_manuais.empty:
+                    dfs_para_salvar.append(df_manuais)
+
+                # Concatenar Tudo e Gravar no Banco
+                if dfs_para_salvar:
+                    df_final = pd.concat(dfs_para_salvar, ignore_index=True)
+                    salvar_posicao_no_banco(
+                        df_final, DATA_REF_DATE, modo="manutencao"
+                    )
+                else:
+                    st.warning(
+                        "Nenhum arquivo ou dado manual válido foi informado."
+                    )
 
 
 # ========== ABA 2: HISTÓRICO E EXPORTAÇÃO ==========
