@@ -902,6 +902,7 @@ with tab3:
                 del st.session_state["df_manut"]
                 st.rerun()
 
+
 # ========== ABA 4: GRÁFICOS ==========
 with tab4:
     st.header("Gráficos")
@@ -930,14 +931,32 @@ with tab4:
             & (df["data"] <= pd.to_datetime(data_fim))
             & (df["empresa"].isin(empresas_filtro))
         )
-        df_filtrado = df[mask]
+        df_filtrado = df[mask].copy()
 
         if not df_filtrado.empty:
+            # --- APLICAÇÃO DA REGRA DE NEGÓCIO NOS GRÁFICOS/KPIs ---
+            # Aqui chamamos a função para recalcular o valor líquido correto por linha
+            def aplicar_regra_linha(row):
+                tipo = str(row.get("tipo_titulo", "")).strip().upper()
+                val = float(row.get("valor", 0.0) or 0.0)
+                
+                if "OBRIG" in tipo:
+                    return -abs(val)
+                elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
+                    return 0.0
+                else:
+                    return abs(val)
+
+            df_filtrado["valor_liquido"] = df_filtrado.apply(aplicar_regra_linha, axis=1)
+
+            # Agrupamento para gráfico de linha utilizando o valor_liquido
             df_total_valor = (
-                df_filtrado.groupby(["data", "empresa"])["valor"]
+                df_filtrado.groupby(["data", "empresa"])["valor_liquido"]
                 .sum()
                 .reset_index()
+                .rename(columns={"valor_liquido": "valor"})
             )
+
             if "qtd_veiculos" in df_filtrado.columns:
                 df_total_qtd = (
                     df_filtrado.groupby(["data", "empresa"])["qtd_veiculos"]
@@ -946,13 +965,16 @@ with tab4:
                 )
             else:
                 df_total_qtd = pd.DataFrame()
+
             data_hoje = df_filtrado["data"].max()
             df_dia = df_filtrado[df_filtrado["data"] == data_hoje]
 
             st.subheader("KPIs do Período")
             kpi1, kpi2, kpi3 = st.columns(3)
-            total_geral = df_filtrado["valor"].sum()
-            total_dia = df_dia["valor"].sum() if not df_dia.empty else 0
+            
+            # Totais recalculados corretamente usando a coluna valor_liquido
+            total_geral = df_filtrado["valor_liquido"].sum()
+            total_dia = df_dia["valor_liquido"].sum() if not df_dia.empty else 0
             media_dia = (
                 df_total_valor.groupby("data")["valor"].sum().mean()
                 if not df_total_valor.empty
