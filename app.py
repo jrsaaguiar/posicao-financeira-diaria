@@ -558,7 +558,7 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
 
         db.commit()
         st.cache_data.clear()
-        st.success(f"{len(df)} registros salvos com sucesso!")
+        #st.success(f"{len(df)} registros salvos com sucesso!")
     except Exception as e:
         db.rollback()
         st.error(f"Erro ao salvar: {e}")
