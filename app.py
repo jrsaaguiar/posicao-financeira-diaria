@@ -51,7 +51,8 @@ def montar_df_dashboard(data_ref, empresas):
 
     for d in dados:
         if d.tipo_titulo in ITENS_ORDEM and d.empresa in empresas:
-            df_pivot.loc[d.tipo_titulo, d.empresa] = d.valor or 0.0
+            valor_float = float(d.valor or 0.0)  # <-- Converte Decimal para float
+            df_pivot.loc[d.tipo_titulo, d.empresa] = valor_float
             df_qtd.loc[d.tipo_titulo, d.empresa] = getattr(d, 'qtd_veiculos', 0) or 0
 
     dados_tabela = []
