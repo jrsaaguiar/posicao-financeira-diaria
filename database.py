@@ -1,5 +1,5 @@
 import streamlit as st
-from sqlalchemy import create_engine, Column, String, Boolean, Integer, Date, Numeric, func # <-- ADICIONA TUDO AQUI
+from sqlalchemy import create_engine, Column, String, Boolean, Integer, Date, Numeric, Float, func
 from sqlalchemy.orm import sessionmaker, declarative_base
 
 DATABASE_URL = st.secrets["DATABASE_URL"]
@@ -20,13 +20,15 @@ class Usuarios(Base):
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
     
-    id = Column(Integer, primary_key=True, index=True) # <-- agora reconhece Integer
-    data = Column(Date, index=True) # <-- agora reconhece Date
+    id = Column(Integer, primary_key=True, index=True)
+    data = Column(Date, index=True)
     empresa = Column(String)
-    tipo = Column(String, index=True)
-    descricao = Column(String)
-    valor = Column(Numeric(15, 2)) # <-- agora reconhece Numeric
-    data_importacao = Column(Date, default=func.current_date()) # <-- agora reconhece func
+    tipo_titulo = Column(String, index=True) # <-- CORRIGIDO: mudado de 'tipo' para 'tipo_titulo'
+    valor = Column(Numeric(15, 2))
+    qtd_veiculos = Column(Integer, default=0) # <-- Adicionado
+    valor_medio = Column(Float, default=0.0)   # <-- Adicionado
+    criado_por = Column(String, nullable=True) # <-- Adicionado
+    data_importacao = Column(Date, default=func.current_date())
 
 def init_db():
     Base.metadata.create_all(bind=engine)
