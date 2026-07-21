@@ -565,6 +565,21 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
         st.dataframe(df)
     finally:
         db.close()
+        
+# --- POPUP DE CONFIRMAÇÃO DE SALVAMENTO ---
+@st.dialog("✅ Registros Salvos com Sucesso!")
+def exibir_popup_sucesso(qtd_registros, data_ref):
+    st.markdown(
+        f"""
+        Os lançamentos para a data **{data_ref.strftime('%d/%m/%Y')}** foram processados e gravados com sucesso no banco de dados!
+
+        - **Total de registros salvos/atualizados:** `{qtd_registros}`
+        """
+    )
+    st.divider()
+    if st.button("👍 Ok, entendi", type="primary", use_container_width=True):
+        st.rerun()
+
 
 # ========== ABA 1: LANÇAMENTO ==========
 with tab1:
