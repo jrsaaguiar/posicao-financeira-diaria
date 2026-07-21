@@ -7,13 +7,14 @@ import hashlib
 import random
 import string
 import plotly.express as px
-from models import Usuario, SessionLocal
-from database import engine, SessionLocal, PosicaoDiaria, Usuarios, init_db # <-- junta tudo aqui
+
+# Juntar tudo do database.py
+from database import Usuario, SessionLocal, engine, PosicaoDiaria, init_db 
+
 from auth import verificar_login, tela_cadastro_usuario
 from exportar import gerar_excel_dashboard
 from processamento_rfn import carregar_posicao_analitica, carregar_obrigacoes, carregar_creditos_nao_identificados, carregar_adiantamentos
 from utils import converter_valor_br, detectar_empresa, normalizar_tipo
-
 st.set_page_config(page_title="Posição Financeira Diária", layout="wide") # <-- deixa só 1
 
 #init_db() # <-- cria as tabelas na primeira vez
