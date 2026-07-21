@@ -96,7 +96,17 @@ def gerar_excel_dashboard(data_ref, empresas):
                 cell_desc.border = thin_border
                 cell_val.border = thin_border
 
-                total_emp += valor
+                # --- REGRA DE NEGÓCIO DO TOTAL ---
+                # 1. 'OBRIG. A PAGA' ou 'OBRIGAÇÕES' subtrai (-)
+                if 'OBRIG' in item.upper():
+                    total_emp -= valor
+                # 2. 'TRANSITORIA' e 'DIF_TRANS_ADIANT' são ignoradas (não somam nem subtraem)
+                elif item in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
+                    pass
+                # 3. Todos os demais ativos somam (+)
+                else:
+                    total_emp += valor
+
                 linha_item += 1
 
             # TOTAL
