@@ -1,3 +1,4 @@
+# processamento_rfn.py
 import pandas as pd
 from utils import detectar_empresa, converter_valor_br, normalizar_tipo
 
