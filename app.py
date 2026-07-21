@@ -16,7 +16,7 @@ from utils import converter_valor_br, detectar_empresa, normalizar_tipo
 
 st.set_page_config(page_title="Posição Financeira Diária", layout="wide") # <-- deixa só 1
 
-init_db() # <-- cria as tabelas na primeira vez
+#init_db() # <-- cria as tabelas na primeira vez
 
 def gerar_hash(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
