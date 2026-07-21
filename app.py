@@ -643,65 +643,52 @@ with tab1:
         if btn_salvar_tudo:
             dfs_para_salvar = []
 
-            with st.spinner("Classificando e processando relatórios..."):
-                arquivos_classificados = {
-                    "posicao": [],
-                    "obrigacoes": [],
-                    "creditos": [],
-                    "adiantamentos": [],
-                }
-
-                # Classificação automática por palavras-chave
+            with st.spinner("Processando relatórios e lançamentos manuais..."):
+                
+                # 1. Processar relatórios usando a lista completa de arquivos enviados
                 if arquivos_carregados:
-                    for arq in arquivos_carregados:
-                        nome_lower = arq.name.lower()
-
-                        if any(k in nome_lower for k in ["posicao", "analitica", "posição"]):
-                            arquivos_classificados["posicao"].append(arq)
-                        elif any(k in nome_lower for k in ["obrig", "obrigacao", "obricações"]):
-                            arquivos_classificados["obrigacoes"].append(arq)
-                        elif any(k in nome_lower for k in ["credito", "crédito", "nao_ident"]):
-                            arquivos_classificados["creditos"].append(arq)
-                        elif any(k in nome_lower for k in ["adiant", "adiantamento"]):
-                            arquivos_classificados["adiantamentos"].append(arq)
-                        else:
-                            arquivos_classificados["posicao"].append(arq)
-
-                # Processar os arquivos identificados
-                if arquivos_classificados["posicao"]:
-                    df_p = carregar_posicao_analitica(arquivos_classificados["posicao"])
+                    df_p = carregar_posicao_analitica(arquivos_carregados)
                     if df_p is not None and not df_p.empty:
                         dfs_para_salvar.append(df_p)
 
-                if arquivos_classificados["obrigacoes"]:
-                    df_o = carregar_obrigacoes(arquivos_classificados["obrigacoes"])
+                    df_o = carregar_obrigacoes(arquivos_carregados)
                     if df_o is not None and not df_o.empty:
                         dfs_para_salvar.append(df_o)
 
-                if arquivos_classificados["creditos"]:
-                    df_c = carregar_creditos_nao_identificados(arquivos_classificados["creditos"])
+                    df_c = carregar_creditos_nao_identificados(arquivos_carregados)
                     if df_c is not None and not df_c.empty:
                         dfs_para_salvar.append(df_c)
 
-                if arquivos_classificados["adiantamentos"]:
-                    df_a = carregar_adiantamentos(arquivos_classificados["adiantamentos"])
+                    df_a = carregar_adiantamentos(arquivos_carregados)
                     if df_a is not None and not df_a.empty:
                         dfs_para_salvar.append(df_a)
 
-                # Adicionar Lançamentos Manuais
+                # 2. Processar Lançamentos Manuais
                 df_manuais = pd.DataFrame(dados_manuais_form)
                 if not df_manuais.empty:
                     dfs_para_salvar.append(df_manuais)
 
-                # Concatenar Tudo e Gravar no Banco
+                # 3. Concatenar e padronizar nomes das colunas
                 if dfs_para_salvar:
                     df_final = pd.concat(dfs_para_salvar, ignore_index=True)
+                    
+                    # Padroniza as colunas vindas do processamento_rfn.py para o padrão do salvar_posicao_no_banco
+                    renomear_cols = {
+                        "empresa": "Empresa",
+                        "tipo_titulo": "Tipo de Título",
+                        "valor": "Saldo",
+                        "qtd_veiculos": "Qtd",
+                        "valor_medio": "ValorMedio"
+                    }
+                    df_final.rename(columns=renomear_cols, inplace=True)
+
+                    # 4. Grava no Banco
                     salvar_posicao_no_banco(
                         df_final, DATA_REF_DATE, modo="manutencao"
                     )
                 else:
                     st.warning(
-                        "Nenhum arquivo ou dado manual válido foi informado."
+                        "Nenhum arquivo válido ou dado manual foi informado."
                     )
 
 
