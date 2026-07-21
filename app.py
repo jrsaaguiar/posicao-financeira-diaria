@@ -620,7 +620,6 @@ def exibir_popup_sucesso(qtd_registros, data_ref):
         st.rerun()
 
 # ========== ABA 1: LANÇAMENTO ==========
-# ========== ABA 1: LANÇAMENTO ==========
 with tab1:
     st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
 
@@ -902,7 +901,6 @@ with tab3:
                 del st.session_state["df_manut"]
                 st.rerun()
 
-
 # ========== ABA 4: GRÁFICOS ==========
 with tab4:
     st.header("Gráficos")
@@ -935,11 +933,11 @@ with tab4:
 
         if not df_filtrado.empty:
             # --- APLICAÇÃO DA REGRA DE NEGÓCIO NOS GRÁFICOS/KPIs ---
-            # Aqui chamamos a função para recalcular o valor líquido correto por linha
+            # Recalcula o valor líquido correto por linha
             def aplicar_regra_linha(row):
                 tipo = str(row.get("tipo_titulo", "")).strip().upper()
                 val = float(row.get("valor", 0.0) or 0.0)
-                
+
                 if "OBRIG" in tipo:
                     return -abs(val)
                 elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
@@ -947,7 +945,9 @@ with tab4:
                 else:
                     return abs(val)
 
-            df_filtrado["valor_liquido"] = df_filtrado.apply(aplicar_regra_linha, axis=1)
+            df_filtrado["valor_liquido"] = df_filtrado.apply(
+                aplicar_regra_linha, axis=1
+            )
 
             # Agrupamento para gráfico de linha utilizando o valor_liquido
             df_total_valor = (
@@ -967,14 +967,16 @@ with tab4:
                 df_total_qtd = pd.DataFrame()
 
             data_hoje = df_filtrado["data"].max()
-            df_dia = df_filtrado[df_filtrado["data"] == data_hoje]
+            df_dia = df_filtrado[df_filtrado["data"] == data_hoje].copy()
 
             st.subheader("KPIs do Período")
             kpi1, kpi2, kpi3 = st.columns(3)
-            
+
             # Totais recalculados corretamente usando a coluna valor_liquido
             total_geral = df_filtrado["valor_liquido"].sum()
-            total_dia = df_dia["valor_liquido"].sum() if not df_dia.empty else 0
+            total_dia = (
+                df_dia["valor_liquido"].sum() if not df_dia.empty else 0
+            )
             media_dia = (
                 df_total_valor.groupby("data")["valor"].sum().mean()
                 if not df_total_valor.empty
@@ -1031,31 +1033,46 @@ with tab4:
             st.subheader(
                 f"3. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}"
             )
+            # Utiliza valor_liquido para refletir obrigações (negativas) e zera transitórias
             fig3 = px.bar(
                 df_dia,
                 x="tipo_titulo",
-                y="valor",
+                y="valor_liquido",
                 color="empresa",
                 barmode="group",
             )
-            fig3.update_layout(height=400, xaxis_tickangle=-45)
+            fig3.update_layout(
+                height=400, xaxis_tickangle=-45, yaxis_title="Valor Líquido R$"
+            )
             fig3.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
             st.plotly_chart(fig3, width="stretch")
 
             st.subheader(
                 f"4. Distribuição % por Conta - {data_hoje.strftime('%d/%m/%Y')}"
             )
+            # Filtra itens com saldo zero/transitórias e calcula a distribuição em valor absoluto
             df_pizza = (
-                df_dia.groupby("tipo_titulo")["valor"].sum().reset_index()
+                df_dia[df_dia["valor_liquido"] != 0]
+                .groupby("tipo_titulo")["valor_liquido"]
+                .sum()
+                .abs()
+                .reset_index()
             )
-            fig4 = px.pie(
-                df_pizza, names="tipo_titulo", values="valor", hole=0.4
-            )
-            fig4.update_traces(
-                texttemplate="%{label}<br>R$ %{value:,.2f}<br>%{percent}"
-            )
-            fig4.update_layout(height=400)
-            st.plotly_chart(fig4, width="stretch")
+
+            if not df_pizza.empty:
+                fig4 = px.pie(
+                    df_pizza,
+                    names="tipo_titulo",
+                    values="valor_liquido",
+                    hole=0.4,
+                )
+                fig4.update_traces(
+                    texttemplate="%{label}<br>R$ %{value:,.2f}<br>%{percent}"
+                )
+                fig4.update_layout(height=400)
+                st.plotly_chart(fig4, width="stretch")
+            else:
+                st.info("Sem dados relevantes para o gráfico de distribuição no dia.")
 
         else:
             st.warning("Nenhum dado encontrado para os filtros selecionados.")
