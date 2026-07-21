@@ -118,10 +118,8 @@ if st.session_state['logado']:
     if st.session_state['perfil'] == 'Admin':
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             st.markdown("#### Usuários Cadastrados")
-            #db = SessionLocal()
             with SessionLocal() as db:
-            users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
-            db.close()
+                users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
             selected_email = None
             if users:
                 df_users = pd.DataFrame([{
