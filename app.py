@@ -63,14 +63,15 @@ ITENS_ORDEM = [
     "DIF_TRANS_ADIANT",
 ]
 
-
+#------ Monta dashBoard ------
 @st.cache_data(ttl=10)
 def montar_df_dashboard(data_ref, empresas):
     with SessionLocal() as db:
         dados = (
             db.query(PosicaoDiaria)
             .filter(
-                PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa.in_(empresas)
+                PosicaoDiaria.data == data_ref,
+                PosicaoDiaria.empresa.in_(empresas),
             )
             .all()
         )
@@ -100,30 +101,25 @@ def montar_df_dashboard(data_ref, empresas):
                 linha[emp] = formatar_br(valor)
         dados_tabela.append(linha)
 
+    # --- CÁLCULO DA LINHA TOTAL (REGRA LÍQUIDA APLICADA) ---
     linha_total = {"DESCRICAO": "TOTAL"}
     for emp in empresas:
-        obrig = (
-            df_pivot.loc["OBRIG. A PAGA", emp]
-            if "OBRIG. A PAGA" in df_pivot.index
-            else 0
-        )
-        trans = (
-            df_pivot.loc["TRANSITORIA", emp]
-            if "TRANSITORIA" in df_pivot.index
-            else 0
-        )
-        dif_trans = (
-            df_pivot.loc["DIF_TRANS_ADIANT", emp]
-            if "DIF_TRANS_ADIANT" in df_pivot.index
-            else 0
-        )
+        total_emp = 0.0
+        for item in df_pivot.index:
+            val = df_pivot.loc[item, emp]
+            item_upper = str(item).upper()
 
-        total_emp = df_pivot[emp].sum() - obrig - trans - dif_trans
+            if "OBRIG" in item_upper:
+                total_emp -= abs(val)  # Subtrai Obrigações
+            elif item_upper in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
+                pass  # Zera/Ignora Transitórias
+            else:
+                total_emp += abs(val)  # Soma Ativos
+
         linha_total[emp] = formatar_br(total_emp)
 
     dados_tabela.append(linha_total)
     return pd.DataFrame(dados_tabela)
-
 
 def tela_login():
     st.title("🔒 Acesso Restrito - Posição Diária")
