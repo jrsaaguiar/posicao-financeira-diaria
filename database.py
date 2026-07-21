@@ -14,8 +14,12 @@ engine = create_engine(
         "connect_timeout": 10
     }
 )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
+
+def init_db():
+    Base.metadata.create_all(bind=engine)
 
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
