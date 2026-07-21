@@ -1034,21 +1034,8 @@ with tab4:
             fig1.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
             st.plotly_chart(fig1, width="stretch")
 
-            if not df_total_qtd.empty:
-                st.subheader("2. Evolução da QTD de Veículos por Empresa")
-                fig2 = px.line(
-                    df_total_qtd,
-                    x="data",
-                    y="qtd_veiculos",
-                    color="empresa",
-                    markers=True,
-                )
-                fig2.update_layout(height=400)
-                fig2.update_yaxes(tickformat=",.0f")
-                st.plotly_chart(fig2, width="stretch")
-
             st.subheader(
-                f"3. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}"
+                f"2. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}"
             )
             # Utiliza valor_liquido para refletir obrigações (negativas) e zera transitórias
             fig3 = px.bar(
