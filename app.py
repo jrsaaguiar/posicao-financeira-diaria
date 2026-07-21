@@ -87,14 +87,15 @@ def tela_login():
         if entrar:
             db = SessionLocal()
             senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-           #user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
-            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash).first()
+            
+            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first() # <-- adiciona ativo=True
             db.close()
+            
             if user:
                 st.session_state['logado'] = True
                 st.session_state['usuario'] = user.nome
                 st.session_state['email'] = user.email
-                st.session_state['perfil'] = getattr(user, 'perfil', 'Usuario')
+                st.session_state['perfil'] = user.perfil # <-- pode tirar o getattr agora que existe
                 st.rerun()
             else:
                 st.error("Email ou senha inválidos")
