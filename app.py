@@ -708,6 +708,8 @@ with tab1:
                     salvar_posicao_no_banco(
                         df_final, DATA_REF_DATE, modo="manutencao"
                     )
+                    # Chama o Popup com o total de registros salvos
+                    exibir_popup_sucesso(len(df_final), DATA_REF_DATE)
                 else:
                     st.warning(
                         "Nenhum arquivo válido ou dado manual foi informado."
