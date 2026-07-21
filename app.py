@@ -461,13 +461,11 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
     if "ValorMedio" not in df.columns:
         df["ValorMedio"] = 0.0
 
-    # 2. Corrigir duplicidade de colunas (caso haja duas colunas 'Saldo', 'Empresa', etc.)
-    if isinstance(df.get("Saldo"), pd.DataFrame):
-        df["Saldo"] = df["Saldo"].bfill(axis=1).iloc[:, 0]
-    if isinstance(df.get("Empresa"), pd.DataFrame):
-        df["Empresa"] = df["Empresa"].bfill(axis=1).iloc[:, 0]
-    if isinstance(df.get("Tipo de Título"), pd.DataFrame):
-        df["Tipo de Título"] = df["Tipo de Título"].bfill(axis=1).iloc[:, 0]
+    # 2. Corrigir duplicidade de colunas (Garante que df["Coluna"] seja sempre 1D / Series)
+    for col in ["Saldo", "Empresa", "Tipo de Título", "Qtd", "ValorMedio"]:
+        if col in df.columns and isinstance(df[col], pd.DataFrame):
+            # Se houver mais de uma coluna com o mesmo nome, consolida pegando o primeiro valor não nulo
+            df[col] = df[col].bfill(axis=1).iloc[:, 0]
 
     # 3. Converter valores numéricos tratando NaNs e Infs
     df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce").fillna(0.0)
