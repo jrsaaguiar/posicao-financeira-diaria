@@ -1,4 +1,4 @@
-# App.py
+# app inicializao
 import hashlib
 import random
 import string
@@ -23,7 +23,7 @@ from utils import converter_valor_br, detectar_empresa, normalizar_tipo
 
 st.set_page_config(page_title="Posição Financeira Diária", layout="wide")
 
-init_db()  # <-- descomenta só na primeira vez pra criar as tabelas
+init_db()
 
 
 def gerar_hash(senha):
@@ -192,7 +192,7 @@ if st.session_state["logado"]:
                 )
                 selected = st.dataframe(
                     df_users,
-                    use_container_width=True,
+                    width="stretch",
                     hide_index=True,
                     height=200,
                     on_select="rerun",
@@ -241,11 +241,11 @@ if st.session_state["logado"]:
 
                 col1, col2 = st.columns(2)
                 btn_salvar = col1.form_submit_button(
-                    "💾 Salvar", use_container_width=True
+                    "💾 Salvar", width="stretch"
                 )
                 btn_senha = col2.form_submit_button(
                     "🔑 Nova Senha",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=not bool(user_edit),
                 )
 
@@ -470,7 +470,7 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
         .replace([np.inf, -np.inf], 0.0)
     )
 
-    # 3. Tratar e limpar colunas de texto (Remover NaNs de verdade)
+    # 3. Tratar e limpar colunas de texto
     df["Empresa"] = df["Empresa"].astype(str).str.strip()
     df["Tipo de Título"] = df["Tipo de Título"].astype(str).str.strip()
 
@@ -568,25 +568,18 @@ with tab1:
     )
 
     with st.form("form_lancamento_unico"):
-        # --- Importação de Arquivos ---
+        # --- Importação de Arquivos Selecionando Todos de Uma Vez ---
         st.subheader("📁 Importação de Relatórios Automáticos")
-        col_up1, col_up2 = st.columns(2)
-        with col_up1:
-            arq_posicao = st.file_uploader(
-                "Posição Analítica", type=["xlsx", "xls", "csv"], key="up_posicao"
-            )
-            arq_obrig = st.file_uploader(
-                "Obrigações", type=["xlsx", "xls", "csv"], key="up_obrig"
-            )
-        with col_up2:
-            arq_creditos = st.file_uploader(
-                "Créditos Não Identificados",
-                type=["xlsx", "xls", "csv"],
-                key="up_creditos",
-            )
-            arq_adiant = st.file_uploader(
-                "Adiantamentos", type=["xlsx", "xls", "csv"], key="up_adiant"
-            )
+        st.caption(
+            "💡 **Dica:** Selecione ou arraste todos os relatórios do dia de uma só vez."
+        )
+
+        arquivos_carregados = st.file_uploader(
+            "Selecione os relatórios em lote (Excel / CSV)",
+            type=["xlsx", "xls", "csv"],
+            accept_multiple_files=True,
+            key="up_arquivos_multiplos",
+        )
 
         st.divider()
 
@@ -644,31 +637,54 @@ with tab1:
         btn_salvar_tudo = st.form_submit_button(
             "🚀 Salvar e Processar Posição Completa",
             type="primary",
-            use_container_width=True,
+            width="stretch",
         )
 
         if btn_salvar_tudo:
             dfs_para_salvar = []
 
-            with st.spinner("Processando relatórios e dados manuais..."):
-                # Processar Arquivos Enviados
-                if arq_posicao:
-                    df_p = carregar_posicao_analitica(arq_posicao)
+            with st.spinner("Classificando e processando relatórios..."):
+                arquivos_classificados = {
+                    "posicao": [],
+                    "obrigacoes": [],
+                    "creditos": [],
+                    "adiantamentos": [],
+                }
+
+                # Classificação automática por palavras-chave
+                if arquivos_carregados:
+                    for arq in arquivos_carregados:
+                        nome_lower = arq.name.lower()
+
+                        if any(k in nome_lower for k in ["posicao", "analitica", "posição"]):
+                            arquivos_classificados["posicao"].append(arq)
+                        elif any(k in nome_lower for k in ["obrig", "obrigacao", "obricações"]):
+                            arquivos_classificados["obrigacoes"].append(arq)
+                        elif any(k in nome_lower for k in ["credito", "crédito", "nao_ident"]):
+                            arquivos_classificados["creditos"].append(arq)
+                        elif any(k in nome_lower for k in ["adiant", "adiantamento"]):
+                            arquivos_classificados["adiantamentos"].append(arq)
+                        else:
+                            arquivos_classificados["posicao"].append(arq)
+
+                # Processar os arquivos identificados
+                if arquivos_classificados["posicao"]:
+                    df_p = carregar_posicao_analitica(arquivos_classificados["posicao"])
                     if df_p is not None and not df_p.empty:
                         dfs_para_salvar.append(df_p)
 
-                if arq_obrig:
-                    df_o = carregar_obrigacoes(arq_obrig)
+                if arquivos_classificados["obrigacoes"]:
+                    df_o = carregar_obrigacoes(arquivos_classificados["obrigacoes"])
                     if df_o is not None and not df_o.empty:
                         dfs_para_salvar.append(df_o)
 
-                if arq_creditos:
-                    df_c = carregar_creditos_nao_identificados(arq_creditos)
+                if arquivos_classificados["creditos"]:
+                    df_c = carregar_creditos_nao_identificados(arquivos_classificados["creditos"])
                     if df_c is not None and not df_c.empty:
                         dfs_para_salvar.append(df_c)
 
-                if arq_adiant:
-                    df_a = carregar_adiantamentos(arq_adiant)
+                if arquivos_classificados["adiantamentos"]:
+                    df_a = carregar_adiantamentos(arquivos_classificados["adiantamentos"])
                     if df_a is not None and not df_a.empty:
                         dfs_para_salvar.append(df_a)
 
@@ -708,7 +724,7 @@ with tab2:
     st.markdown("#### Preview da Planilha")
     df_preview = montar_df_dashboard(data_export, empresas_export)
     if df_preview is not None:
-        st.dataframe(df_preview, use_container_width=True, hide_index=True)
+        st.dataframe(df_preview, width="stretch", hide_index=True)
         st.divider()
         if st.button("📊 Gerar Excel Dashboard", type="primary"):
             with st.spinner("Montando planilha..."):
@@ -787,7 +803,7 @@ with tab3:
                 ),
             },
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
 
         col_btn1, col_btn2 = st.columns(2)
@@ -897,7 +913,7 @@ with tab4:
             )
             fig1.update_layout(height=400)
             fig1.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
-            st.plotly_chart(fig1, use_container_width=True)
+            st.plotly_chart(fig1, width="stretch")
 
             if not df_total_qtd.empty:
                 st.subheader("2. Evolução da QTD de Veículos por Empresa")
@@ -910,7 +926,7 @@ with tab4:
                 )
                 fig2.update_layout(height=400)
                 fig2.update_yaxes(tickformat=",.0f")
-                st.plotly_chart(fig2, use_container_width=True)
+                st.plotly_chart(fig2, width="stretch")
 
             st.subheader(
                 f"3. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}"
@@ -924,7 +940,7 @@ with tab4:
             )
             fig3.update_layout(height=400, xaxis_tickangle=-45)
             fig3.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
-            st.plotly_chart(fig3, use_container_width=True)
+            st.plotly_chart(fig3, width="stretch")
 
             st.subheader(
                 f"4. Distribuição % por Conta - {data_hoje.strftime('%d/%m/%Y')}"
@@ -939,7 +955,7 @@ with tab4:
                 texttemplate="%{label}<br>R$ %{value:,.2f}<br>%{percent}"
             )
             fig4.update_layout(height=400)
-            st.plotly_chart(fig4, use_container_width=True)
+            st.plotly_chart(fig4, width="stretch")
 
         else:
             st.warning("Nenhum dado encontrado para os filtros selecionados.")
