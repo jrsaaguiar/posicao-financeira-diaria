@@ -18,7 +18,7 @@ from utils import converter_valor_br, detectar_empresa, normalizar_tipo
 
 st.set_page_config(page_title="Posição Financeira Diária", layout="wide")
 
-#init_db() # <-- descomenta só na primeira vez pra criar as tabelas
+init_db() # <-- descomenta só na primeira vez pra criar as tabelas
 
 def gerar_hash(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
@@ -118,8 +118,10 @@ if st.session_state['logado']:
     if st.session_state['perfil'] == 'Admin':
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             st.markdown("#### Usuários Cadastrados")
+            
             with SessionLocal() as db:
                 users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
+                
             selected_email = None
             if users:
                 df_users = pd.DataFrame([{
@@ -192,12 +194,15 @@ if st.session_state['logado']:
 
     col_m, col_ws, col_e = st.sidebar.columns(3)
     empresas_cards = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
-
+    
     @st.cache_data(ttl=10)
     def get_total_empresa(data, empresa):
-        db = SessionLocal()
-        try:
-            regs = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data, PosicaoDiaria.empresa == empresa).all()
+        with SessionLocal() as db:
+            regs = db.query(PosicaoDiaria).filter(
+                PosicaoDiaria.data == data, 
+                PosicaoDiaria.empresa == empresa
+            ).all()
+            
             total = 0.0
             for r in regs:
                 if r.tipo_titulo == 'OBRIG. A PAGA':
@@ -205,8 +210,6 @@ if st.session_state['logado']:
                 elif r.tipo_titulo not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
                     total += (r.valor or 0.0)
             return total
-        finally:
-            db.close()
 
     @st.cache_data(ttl=10)
     def get_variacao_empresa(data_atual, data_anterior, empresa):
@@ -217,6 +220,7 @@ if st.session_state['logado']:
         if total_anterior == 0:
             return 0.0
         return ((total_atual - total_anterior) / total_anterior) * 100
+   
 
     for emp, col in empresas_cards.items():
         if emp not in empresas_selecionadas:
