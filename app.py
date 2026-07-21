@@ -205,10 +205,13 @@ if st.session_state['logado']:
             
             total = 0.0
             for r in regs:
+                valor_float = float(r.valor or 0.0)  # <-- Converte Decimal para float
+                
                 if r.tipo_titulo == 'OBRIG. A PAGA':
-                    total -= (r.valor or 0.0)
-                elif r.tipo_titulo not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']:
-                    total += (r.valor or 0.0)
+                    total -= valor_float
+                elif r.tipo_titulo not in ['TRANSITORIA', 'DIF_TRANS_A...']: # ajuste com suas strings completas
+                    total += valor_float
+            
             return total
 
     @st.cache_data(ttl=10)
