@@ -576,7 +576,6 @@ def exibir_popup_sucesso(qtd_registros, data_ref):
     if st.button("👍 Ok, entendi", type="primary", use_container_width=True):
         st.rerun()
 
-
 # ========== ABA 1: LANÇAMENTO ==========
 with tab1:
     st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
@@ -699,6 +698,36 @@ with tab1:
                         "valor_medio": "ValorMedio"
                     }
                     df_final.rename(columns=renomear_cols, inplace=True)
+
+                    # --- CÁLCULO DA DIF_TRANS_ADIANT (ADIANTAMENTOS - TRANSITORIA) ---
+                    # 1. Tratamento de colunas e tipos
+                    df_final["Tipo de Título"] = df_final["Tipo de Título"].astype(str).str.strip()
+                    df_final["Empresa"] = df_final["Empresa"].astype(str).str.strip()
+                    df_final["Saldo"] = pd.to_numeric(df_final["Saldo"], errors="coerce").fillna(0.0)
+
+                    # 2. Remove calculo anterior do tipo DIF_TRANS_ADIANT para nao duplicar
+                    df_final = df_final[df_final["Tipo de Título"] != "DIF_TRANS_ADIANT"]
+
+                    # 3. Calcula APENAS para empresas onde TRANSITORIA > 0
+                    novas_linhas_dif = []
+                    for emp in ["MATRIZ", "WS", "EUSEBIO"]:
+                        trans = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "TRANSITORIA")]["Saldo"].sum()
+                        
+                        # Regra: Só executa se TRANSITORIA tiver saldo positivo (> 0)
+                        if trans > 0:
+                            adiant = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "ADIANTAMENTOS")]["Saldo"].sum()
+                            diferenca = adiant - trans
+                            
+                            novas_linhas_dif.append({
+                                "Empresa": emp,
+                                "Tipo de Título": "DIF_TRANS_ADIANT",
+                                "Saldo": diferenca,
+                                "Qtd": 0,
+                                "ValorMedio": 0.0
+                            })
+
+                    if novas_linhas_dif:
+                        df_final = pd.concat([df_final, pd.DataFrame(novas_linhas_dif)], ignore_index=True)
 
                     # 4. Grava no Banco
                     salvar_posicao_no_banco(
