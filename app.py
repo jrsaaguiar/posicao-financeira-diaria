@@ -241,14 +241,15 @@ if st.session_state["logado"]:
 
                 col1, col2 = st.columns(2)
                 btn_salvar = col1.form_submit_button(
-                    "💾 Salvar", width="stretch"
+                    "💾 Salvar", use_container_width=True
                 )
                 btn_senha = col2.form_submit_button(
                     "🔑 Nova Senha",
-                    width="stretch",
+                    use_container_width=True,
                     disabled=not bool(user_edit),
                 )
 
+            # --- TRATAMENTO DO BOTÃO SALVAR ---
             if btn_salvar:
                 with SessionLocal() as db:
                     if user_edit:
@@ -262,7 +263,7 @@ if st.session_state["logado"]:
                             if hasattr(u_db, "perfil"):
                                 u_db.perfil = perfil
                             u_db.ativo = ativo
-                            msg = "Usuário atualizado!"
+                            msg = "Usuário atualizado com sucesso!"
                     else:
                         if db.query(Usuarios).filter_by(email=email).first():
                             st.error("Erro: Este email já está cadastrado")
@@ -276,10 +277,26 @@ if st.session_state["logado"]:
                             ativo=ativo,
                         )
                         db.add(novo)
-                        msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
+                        msg = f"Usuário cadastrado! Senha inicial: `{senha_temp}`"
                     db.commit()
                 st.success(msg)
                 st.rerun()
+
+            # --- TRATAMENTO DO BOTÃO NOVA SENHA ---
+            if btn_senha and user_edit:
+                nova_senha_temp = gerar_senha_aleatoria()
+                with SessionLocal() as db:
+                    u_db = (
+                        db.query(Usuarios)
+                        .filter(Usuarios.email == user_edit.email)
+                        .first()
+                    )
+                    if u_db:
+                        u_db.senha_hash = gerar_hash(nova_senha_temp)
+                        db.commit()
+                        st.warning(
+                            f"🔑 Nova senha gerada para **{u_db.nome}**: `{nova_senha_temp}`"
+                        )
 
     st.sidebar.divider()
     st.sidebar.markdown("### Data de Referência")
