@@ -87,7 +87,8 @@ def tela_login():
         if entrar:
             db = SessionLocal()
             senha_hash = hashlib.sha256(senha.encode()).hexdigest()
-            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
+           #user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
+            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash).first()
             db.close()
             if user:
                 st.session_state['logado'] = True
