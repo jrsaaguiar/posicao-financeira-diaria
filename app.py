@@ -577,6 +577,7 @@ def exibir_popup_sucesso(qtd_registros, data_ref):
         st.rerun()
 
 # ========== ABA 1: LANÇAMENTO ==========
+# ========== ABA 1: LANÇAMENTO ==========
 with tab1:
     st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
 
@@ -664,74 +665,68 @@ with tab1:
                 
                 # 1. Processar relatórios usando a lista completa de arquivos enviados
                 if arquivos_carregados:
-                    df_p = carregar_posicao_analitica(arquivos_carregados)
-                    if df_p is not None and not df_p.empty:
-                        dfs_para_salvar.append(df_p)
-
-                    df_o = carregar_obrigacoes(arquivos_carregados)
-                    if df_o is not None and not df_o.empty:
-                        dfs_para_salvar.append(df_o)
-
-                    df_c = carregar_creditos_nao_identificados(arquivos_carregados)
-                    if df_c is not None and not df_c.empty:
-                        dfs_para_salvar.append(df_c)
-
-                    df_a = carregar_adiantamentos(arquivos_carregados)
-                    if df_a is not None and not df_a.empty:
-                        dfs_para_salvar.append(df_a)
+                    for fn in [carregar_posicao_analitica, carregar_obrigacoes, carregar_creditos_nao_identificados, carregar_adiantamentos]:
+                        res_df = fn(arquivos_carregados)
+                        if res_df is not None and not res_df.empty:
+                            # Padroniza colunas individualmente antes de juntar
+                            res_df = res_df.rename(columns={
+                                "empresa": "Empresa",
+                                "tipo_titulo": "Tipo de Título",
+                                "valor": "Saldo",
+                                "qtd_veiculos": "Qtd",
+                                "valor_medio": "ValorMedio"
+                            })
+                            dfs_para_salvar.append(res_df)
 
                 # 2. Processar Lançamentos Manuais
                 df_manuais = pd.DataFrame(dados_manuais_form)
                 if not df_manuais.empty:
                     dfs_para_salvar.append(df_manuais)
 
-                # 3. Concatenar e padronizar nomes das colunas
+                # 3. Concatenar e padronizar
                 if dfs_para_salvar:
                     df_final = pd.concat(dfs_para_salvar, ignore_index=True)
                     
-                    # Padroniza tanto colunas minúsculas quanto maiúsculas vindas do processamento_rfn.py
-                    renomear_cols = {
+                    # Remove colunas duplicadas que possam ter surgido
+                    df_final = df_final.loc[:, ~df_final.columns.duplicated()].copy()
+
+                    # Garante nomes padronizados
+                    df_final.rename(columns={
                         "empresa": "Empresa",
                         "tipo_titulo": "Tipo de Título",
                         "valor": "Saldo",
                         "qtd_veiculos": "Qtd",
                         "valor_medio": "ValorMedio"
-                    }
-                    df_final.rename(columns=renomear_cols, inplace=True)
+                    }, inplace=True)
 
                     # --- CÁLCULO SEGURO DA DIF_TRANS_ADIANT ---
-                    col_tipo = "Tipo de Título" if "Tipo de Título" in df_final.columns else "tipo_titulo"
-                    col_emp = "Empresa" if "Empresa" in df_final.columns else "empresa"
-                    col_saldo = "Saldo" if "Saldo" in df_final.columns else "valor"
+                    # Tratamento das colunas garantindo Series única
+                    df_final["Tipo de Título"] = df_final["Tipo de Título"].astype(str).str.strip()
+                    df_final["Empresa"] = df_final["Empresa"].astype(str).str.strip()
+                    df_final["Saldo"] = pd.to_numeric(df_final["Saldo"], errors="coerce").fillna(0.0)
 
-                    if col_tipo in df_final.columns and col_saldo in df_final.columns:
-                        # 1. Tratamento seguro de colunas
-                        df_final[col_tipo] = df_final[col_tipo].astype(str).str.strip()
-                        df_final[col_emp] = df_final[col_emp].astype(str).str.strip()
-                        df_final[col_saldo] = pd.to_numeric(df_final[col_saldo], errors="coerce").fillna(0.0)
+                    # Remove cálculo anterior do tipo DIF_TRANS_ADIANT
+                    df_final = df_final[df_final["Tipo de Título"] != "DIF_TRANS_ADIANT"]
 
-                        # 2. Remove cálculo anterior do tipo DIF_TRANS_ADIANT
-                        df_final = df_final[df_final[col_tipo] != "DIF_TRANS_ADIANT"]
-
-                        # 3. Calcula APENAS para empresas onde TRANSITORIA > 0
-                        novas_linhas_dif = []
-                        for emp in ["MATRIZ", "WS", "EUSEBIO"]:
-                            trans = df_final[(df_final[col_emp] == emp) & (df_final[col_tipo] == "TRANSITORIA")][col_saldo].sum()
+                    # Regra: Calcula APENAS para empresas onde TRANSITORIA > 0
+                    novas_linhas_dif = []
+                    for emp in ["MATRIZ", "WS", "EUSEBIO"]:
+                        trans = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "TRANSITORIA")]["Saldo"].sum()
+                        
+                        if trans > 0:
+                            adiant = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "ADIANTAMENTOS")]["Saldo"].sum()
+                            diferenca = adiant - trans
                             
-                            if trans > 0:
-                                adiant = df_final[(df_final[col_emp] == emp) & (df_final[col_tipo] == "ADIANTAMENTOS")][col_saldo].sum()
-                                diferenca = adiant - trans
-                                
-                                novas_linhas_dif.append({
-                                    "Empresa": emp,
-                                    "Tipo de Título": "DIF_TRANS_ADIANT",
-                                    "Saldo": diferenca,
-                                    "Qtd": 0,
-                                    "ValorMedio": 0.0
-                                })
+                            novas_linhas_dif.append({
+                                "Empresa": emp,
+                                "Tipo de Título": "DIF_TRANS_ADIANT",
+                                "Saldo": diferenca,
+                                "Qtd": 0,
+                                "ValorMedio": 0.0
+                            })
 
-                        if novas_linhas_dif:
-                            df_final = pd.concat([df_final, pd.DataFrame(novas_linhas_dif)], ignore_index=True)
+                    if novas_linhas_dif:
+                        df_final = pd.concat([df_final, pd.DataFrame(novas_linhas_dif)], ignore_index=True)
 
                     # 4. Grava no Banco
                     salvar_posicao_no_banco(
