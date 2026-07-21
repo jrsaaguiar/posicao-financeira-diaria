@@ -376,7 +376,50 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
+def calcular_total_posicao_correto(df):
+    """
+    Calcula o Total Líquido aplicando as regras de negócio:
+    - OBRIGAÇÕES / OBRIG. A PAGA: Subtrai (-)
+    - TRANSITORIA e DIF_TRANS_ADIANT: Ignora (0.0)
+    - Demais títulos: Soma (+)
+    """
+    if df is None or df.empty:
+        return 0.0
 
+    df_calc = df.copy()
+
+    # Identifica colunas
+    col_tipo = (
+        "Tipo de Título"
+        if "Tipo de Título" in df_calc.columns
+        else ("tipo_titulo" if "tipo_titulo" in df_calc.columns else None)
+    )
+    col_saldo = (
+        "Saldo"
+        if "Saldo" in df_calc.columns
+        else ("valor" if "valor" in df_calc.columns else None)
+    )
+
+    if not col_tipo or not col_saldo:
+        return 0.0
+
+    df_calc["tipo_clean"] = (
+        df_calc[col_tipo].astype(str).str.strip().str.upper()
+    )
+
+    def aplicar_regra(row):
+        tipo = row["tipo_clean"]
+        val = float(row[col_saldo] or 0.0)
+
+        if "OBRIG" in tipo:
+            return -abs(val)  # Subtrai obrigações
+        elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
+            return 0.0  # Desconsidera da soma
+        else:
+            return abs(val)  # Soma demais ativos
+
+    df_calc["valor_correto"] = df_calc.apply(aplicar_regra, axis=1)
+    return float(df_calc["valor_correto"].sum())
 
 def get_all_data():
     with engine.connect() as conn:
