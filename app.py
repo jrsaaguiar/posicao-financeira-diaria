@@ -1,3 +1,4 @@
+# app.py
 import pandas as pd
 import streamlit as st
 from datetime import date, timedelta
@@ -40,20 +41,19 @@ ITENS_ORDEM = [
 
 @st.cache_data(ttl=10)
 def montar_df_dashboard(data_ref, empresas):
-    db = SessionLocal()
-    dados = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa.in_(empresas)).all()
-    db.close()
-    if not dados:
-        return None
+    with SessionLocal() as db:
+        dados = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa.in_(empresas)).all()
+        if not dados:
+            return None
 
-    df_pivot = pd.DataFrame(0.0, index=ITENS_ORDEM, columns=empresas)
-    df_qtd = pd.DataFrame(0, index=ITENS_ORDEM, columns=empresas)
+        df_pivot = pd.DataFrame(0.0, index=ITENS_ORDEM, columns=empresas)
+        df_qtd = pd.DataFrame(0, index=ITENS_ORDEM, columns=empresas)
 
-    for d in dados:
-        if d.tipo_titulo in ITENS_ORDEM and d.empresa in empresas:
-            valor_float = float(d.valor or 0.0)  # <-- Converte Decimal para float
-            df_pivot.loc[d.tipo_titulo, d.empresa] = valor_float
-            df_qtd.loc[d.tipo_titulo, d.empresa] = getattr(d, 'qtd_veiculos', 0) or 0
+        for d in dados:
+            if d.tipo_titulo in ITENS_ORDEM and d.empresa in empresas:
+                valor_float = float(d.valor or 0.0)  # <-- Converte Decimal para float
+                df_pivot.loc[d.tipo_titulo, d.empresa] = valor_float
+                df_qtd.loc[d.tipo_titulo, d.empresa] = getattr(d, 'qtd_veiculos', 0) or 0
 
     dados_tabela = []
     for item in ITENS_ORDEM:
@@ -86,11 +86,9 @@ def tela_login():
         senha = st.text_input("Senha", type="password")
         entrar = st.form_submit_button("Entrar")
         if entrar:
-            db = SessionLocal()
             senha_hash = gerar_hash(senha)
-
-            user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
-            db.close()
+            with SessionLocal() as db:
+                user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
 
             if user:
                 st.session_state['logado'] = True
@@ -109,10 +107,9 @@ if not st.session_state['logado']:
     st.stop()
 
 if st.session_state['logado']:
-    db = SessionLocal()
-    user_db = db.query(Usuarios).filter_by(email=st.session_state['email']).first()
-    st.session_state['perfil'] = getattr(user_db, 'perfil', 'Usuario') if user_db else "Usuario"
-    db.close()
+    with SessionLocal() as db:
+        user_db = db.query(Usuarios).filter_by(email=st.session_state['email']).first()
+        st.session_state['perfil'] = getattr(user_db, 'perfil', 'Usuario') if user_db else "Usuario"
 
     st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
@@ -141,9 +138,8 @@ if st.session_state['logado']:
             st.markdown("#### Dados do Usuário")
             user_edit = None
             if selected_email:
-                db = SessionLocal()
-                user_edit = db.query(Usuarios).filter(Usuarios.email == selected_email).first()
-                db.close()
+                with SessionLocal() as db:
+                    user_edit = db.query(Usuarios).filter(Usuarios.email == selected_email).first()
 
             with st.form("form_usuario"):
                 nome = st.text_input("Nome", value=user_edit.nome if user_edit else "")
@@ -157,31 +153,29 @@ if st.session_state['logado']:
                 btn_senha = col2.form_submit_button("🔑 Nova Senha", use_container_width=True, disabled=not bool(user_edit))
 
             if btn_salvar:
-                db = SessionLocal()
-                if user_edit:
-                    u_db = db.query(Usuarios).filter(Usuarios.email == user_edit.email).first()
-                    if u_db:
-                        u_db.nome = nome
-                        if hasattr(u_db, 'perfil'): u_db.perfil = perfil
-                        u_db.ativo = ativo
-                        msg = "Usuário atualizado!"
-                else:
-                    if db.query(Usuarios).filter_by(email=email).first():
-                        st.error("Erro: Este email já está cadastrado")
-                        db.close()
-                        st.stop()
-                    senha_temp = gerar_senha_aleatoria()
-                    novo = Usuarios(
-                        nome=nome,
-                        email=email,
-                        senha_hash=gerar_hash(senha_temp),
-                        perfil=perfil,
-                        ativo=ativo
-                    )
-                    db.add(novo)
-                    msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
-                db.commit()
-                db.close()
+                with SessionLocal() as db:
+                    if user_edit:
+                        u_db = db.query(Usuarios).filter(Usuarios.email == user_edit.email).first()
+                        if u_db:
+                            u_db.nome = nome
+                            if hasattr(u_db, 'perfil'): u_db.perfil = perfil
+                            u_db.ativo = ativo
+                            msg = "Usuário atualizado!"
+                    else:
+                        if db.query(Usuarios).filter_by(email=email).first():
+                            st.error("Erro: Este email já está cadastrado")
+                            st.stop()
+                        senha_temp = gerar_senha_aleatoria()
+                        novo = Usuarios(
+                            nome=nome,
+                            email=email,
+                            senha_hash=gerar_hash(senha_temp),
+                            perfil=perfil,
+                            ativo=ativo
+                        )
+                        db.add(novo)
+                        msg = f"Usuário cadastrado! Senha padrão: `{senha_temp}`"
+                    db.commit()
                 st.success(msg)
                 st.rerun()
 
@@ -210,7 +204,7 @@ if st.session_state['logado']:
                 
                 if r.tipo_titulo == 'OBRIG. A PAGA':
                     total -= valor_float
-                elif r.tipo_titulo not in ['TRANSITORIA', 'DIF_TRANS_A...']: # ajuste com suas strings completas
+                elif r.tipo_titulo not in ['TRANSITORIA', 'DIF_TRANS_ADIANT']: # Correção da string cortada
                     total += valor_float
             
             return total
@@ -273,20 +267,18 @@ ITENS_MANUAIS = [('NOVOS PAGOS', 'NOVOS PAGOS'),('USADOS PAGOS', 'USADOS PAGOS')
 def carregar_valores_manuais_do_banco(data_ref):
     if isinstance(data_ref, str):
         data_ref = date.fromisoformat(data_ref)
-    db = SessionLocal()
     valores = {'MATRIZ': {k: '0,00' for k,_ in ITENS_MANUAIS}, 'WS': {k: '0,00' for k,_ in ITENS_MANUAIS}, 'EUSEBIO': {k: '0,00' for k,_ in ITENS_MANUAIS}}
     valores_qtd = {'MATRIZ': {'NOVOS PAGOS': 0, 'USADOS PAGOS': 0}, 'WS': {'NOVOS PAGOS': 0, 'USADOS PAGOS': 0}, 'EUSEBIO': {'NOVOS PAGOS': 0, 'USADOS PAGOS': 0}}
 
-    registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.tipo_titulo.in_([k for k,_ in ITENS_MANUAIS])).all()
-    for reg in registros:
-        valores[reg.empresa][reg.tipo_titulo] = formatar_br(reg.valor).replace('R$ ', '')
-        if reg.tipo_titulo in ['NOVOS PAGOS', 'USADOS PAGOS']:
-            valores_qtd[reg.empresa][reg.tipo_titulo] = int(getattr(reg, 'qtd_veiculos', 0) or 0)
-    db.close()
+    with SessionLocal() as db:
+        registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.tipo_titulo.in_([k for k,_ in ITENS_MANUAIS])).all()
+        for reg in registros:
+            valores[reg.empresa][reg.tipo_titulo] = formatar_br(reg.valor).replace('R$ ', '')
+            if reg.tipo_titulo in ['NOVOS PAGOS', 'USADOS PAGOS']:
+                valores_qtd[reg.empresa][reg.tipo_titulo] = int(getattr(reg, 'qtd_veiculos', 0) or 0)
     return valores, valores_qtd
 
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
-    db = SessionLocal()
     usuario_logado = st.session_state.get('email', 'sistema')
     df = df.copy()
 
@@ -307,9 +299,9 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
 
     if df.empty:
         st.warning("Nenhuma linha válida para salvar")
-        db.close()
         return
 
+    db = SessionLocal()
     try:
         if modo == 'manutencao':
             for _, row in df.iterrows():
@@ -465,25 +457,24 @@ with tab3:
         empresa_manut = st.selectbox("Empresa", ["TODAS", "MATRIZ", "WS", "EUSEBIO"], key="empresa_manut_aba3")
 
     if st.button("Carregar Dados da Data", key="btn_carregar_manut"):
-        session = SessionLocal()
-        query = session.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_manut)
-        if empresa_manut!= "TODAS":
-            query = query.filter(PosicaoDiaria.empresa == empresa_manut)
-        registros = query.all()
-        session.close()
+        with SessionLocal() as session:
+            query = session.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_manut)
+            if empresa_manut != "TODAS":
+                query = query.filter(PosicaoDiaria.empresa == empresa_manut)
+            registros = query.all()
 
-        if not registros:
-            st.info("Nenhum dado encontrado para essa data/empresa")
-            st.session_state.pop('df_manut', None)
-        else:
-            df_manut = pd.DataFrame([{
-                "id": r.id,
-                "tipo_de_titulo": r.tipo_titulo,
-                "empresa": r.empresa,
-                "saldo": r.valor or 0.0
-            } for r in registros])
-            df_manut = df_manut.sort_values("tipo_de_titulo")
-            st.session_state['df_manut'] = df_manut
+            if not registros:
+                st.info("Nenhum dado encontrado para essa data/empresa")
+                st.session_state.pop('df_manut', None)
+            else:
+                df_manut = pd.DataFrame([{
+                    "id": r.id,
+                    "tipo_de_titulo": r.tipo_titulo,
+                    "empresa": r.empresa,
+                    "saldo": r.valor or 0.0
+                } for r in registros])
+                df_manut = df_manut.sort_values("tipo_de_titulo")
+                st.session_state['df_manut'] = df_manut
 
     if 'df_manut' in st.session_state and not st.session_state['df_manut'].empty:
         st.write("Edite os valores e clique em Salvar")
@@ -502,13 +493,12 @@ with tab3:
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             if st.button("💾 Salvar Alterações", key="btn_salvar_manut"):
-                session = SessionLocal()
-                for _, row in df_editado.iterrows():
-                    reg = session.query(PosicaoDiaria).filter(PosicaoDiaria.id == row['id']).first()
-                    if reg:
-                        reg.valor = float(row['saldo'])
-                session.commit()
-                session.close()
+                with SessionLocal() as session:
+                    for _, row in df_editado.iterrows():
+                        reg = session.query(PosicaoDiaria).filter(PosicaoDiaria.id == row['id']).first()
+                        if reg:
+                            reg.valor = float(row['saldo'])
+                    session.commit()
                 st.cache_data.clear()
                 st.success("Alterações salvas com sucesso!")
                 del st.session_state['df_manut']
@@ -538,7 +528,6 @@ with tab4:
 
         if not df_filtrado.empty:
             df_total_valor = df_filtrado.groupby(['data', 'empresa'])['valor'].sum().reset_index()
-            #df_total_qtd = df_filtrado.groupby(['data', 'empresa'])[getattr(PosicaoDiaria, 'qtd_veiculos', 'qtd_veiculos')].sum().reset_index() if hasattr(PosicaoDiaria, 'qtd_veiculos') else pd.DataFrame()
             if 'qtd_veiculos' in df_filtrado.columns:
                 df_total_qtd = df_filtrado.groupby(['data', 'empresa'])['qtd_veiculos'].sum().reset_index()
             else:
