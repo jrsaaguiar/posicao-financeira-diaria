@@ -1,7 +1,9 @@
+# Requerimentos do projeto
 streamlit
 pandas
-openpyxl
-xlrd
 sqlalchemy
 psycopg2-binary
-reportlab
+openpyxl
+xlrd
+plotly
+python-dotenv

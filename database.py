@@ -1,17 +1,24 @@
+# database.py
 from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
 
 DATABASE_URL = st.secrets["DATABASE_URL"]
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(
+    DATABASE_URL,
+    pool_pre_ping=True,  # <-- TESTA A CONEXÃO ANTES DE USAR. Evita o erro de SSL
+    pool_recycle=300,    # <-- Recicla a conexão a cada 5 min
+    connect_args={"sslmode": "require"} if "sslmode" not in DATABASE_URL else {} # Bom pra Neon/Supabase
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class PosicaoDiaria(Base):
     __tablename__ = "posicoes_diarias"
     id = Column(Integer, primary_key=True, index=True)
-    data = Column(Date, index=True) # <- MUDAR DE String PARA Date
+    data = Column(Date, index=True) 
     empresa = Column(String)
     tipo_titulo = Column(String)
     valor = Column(Float)
@@ -25,7 +32,7 @@ class Usuarios(Base):
     email = Column(String(100), unique=True, nullable=False)
     senha_hash = Column(String(255), nullable=False)
     nome = Column(String(100))
-    perfil = Column(String(20), default="Usuario") # <- Admin ou Usuario
+    perfil = Column(String(20), default="Usuario") 
     ativo = Column(Boolean, default=True)
     
 
