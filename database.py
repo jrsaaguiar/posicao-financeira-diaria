@@ -1,17 +1,19 @@
 # database.py
-from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Boolean
-from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-# Pega a URL dos Secrets do Streamlit
 DATABASE_URL = st.secrets["DATABASE_URL"]
 
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
-    connect_args={"sslmode": "require"}
+    pool_recycle=300,
+    connect_args={
+        "sslmode": "require",
+        "connect_timeout": 10
+    }
 )
-
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
