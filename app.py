@@ -7,7 +7,7 @@ import hashlib
 import random
 import string
 import plotly.express as px
-
+from models import Usuario, SessionLocal
 from database import engine, SessionLocal, PosicaoDiaria, Usuarios, init_db # <-- junta tudo aqui
 from auth import verificar_login, tela_cadastro_usuario
 from exportar import gerar_excel_dashboard
