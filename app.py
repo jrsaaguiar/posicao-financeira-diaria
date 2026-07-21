@@ -119,7 +119,7 @@ if st.session_state['logado']:
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             st.markdown("#### Usuários Cadastrados")
             db = SessionLocal()
-            users = db.query(Usuarios).order_by(Usuarios.id.desc()).all()
+            users = db.query(Usuario).order_by(Usuario.id.desc()).all()
             db.close()
             selected_id = None
             if users:
