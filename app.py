@@ -450,18 +450,26 @@ def carregar_valores_manuais_do_banco(data_ref):
                 )
     return valores, valores_qtd
 
-
+# Salvar registro em banco
 def salvar_posicao_no_banco(df, data_ref, modo="novo"):
     usuario_logado = st.session_state.get("email", "sistema")
     df = df.copy()
 
-    # 1. Garantir existência das colunas
+    # 1. Garantir existência das colunas necessárias
     if "Qtd" not in df.columns:
         df["Qtd"] = 0
     if "ValorMedio" not in df.columns:
         df["ValorMedio"] = 0.0
 
-    # 2. Converter valores numéricos tratando NaNs e Infs
+    # 2. Corrigir duplicidade de colunas (caso haja duas colunas 'Saldo', 'Empresa', etc.)
+    if isinstance(df.get("Saldo"), pd.DataFrame):
+        df["Saldo"] = df["Saldo"].bfill(axis=1).iloc[:, 0]
+    if isinstance(df.get("Empresa"), pd.DataFrame):
+        df["Empresa"] = df["Empresa"].bfill(axis=1).iloc[:, 0]
+    if isinstance(df.get("Tipo de Título"), pd.DataFrame):
+        df["Tipo de Título"] = df["Tipo de Título"].bfill(axis=1).iloc[:, 0]
+
+    # 3. Converter valores numéricos tratando NaNs e Infs
     df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce").fillna(0.0)
     df["Qtd"] = pd.to_numeric(df["Qtd"], errors="coerce").fillna(0).astype(int)
     df["ValorMedio"] = (
@@ -470,7 +478,7 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
         .replace([np.inf, -np.inf], 0.0)
     )
 
-    # 3. Tratar e limpar colunas de texto
+    # 4. Tratar e limpar colunas de texto
     df["Empresa"] = df["Empresa"].astype(str).str.strip()
     df["Tipo de Título"] = df["Tipo de Título"].astype(str).str.strip()
 
@@ -557,7 +565,6 @@ def salvar_posicao_no_banco(df, data_ref, modo="novo"):
         st.dataframe(df)
     finally:
         db.close()
-
 
 # ========== ABA 1: LANÇAMENTO ==========
 with tab1:
