@@ -277,55 +277,87 @@ def carregar_valores_manuais_do_banco(data_ref):
             if reg.tipo_titulo in ['NOVOS PAGOS', 'USADOS PAGOS']:
                 valores_qtd[reg.empresa][reg.tipo_titulo] = int(getattr(reg, 'qtd_veiculos', 0) or 0)
     return valores, valores_qtd
-
+#----
 def salvar_posicao_no_banco(df, data_ref, modo='novo'):
     usuario_logado = st.session_state.get('email', 'sistema')
     df = df.copy()
 
-    if 'Qtd' not in df.columns: df['Qtd'] = 0
-    if 'ValorMedio' not in df.columns: df['ValorMedio'] = 0.0
+    # 1. Garantir existência das colunas
+    if 'Qtd' not in df.columns: 
+        df['Qtd'] = 0
+    if 'ValorMedio' not in df.columns: 
+        df['ValorMedio'] = 0.0
 
+    # 2. Converter valores numéricos tratando NaNs e Infs
     df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
     df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0).astype(int)
     df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0).replace([np.inf, -np.inf], 0.0)
+
+    # 3. Tratar e limpar colunas de texto (Remover NaNs de verdade)
     df['Empresa'] = df['Empresa'].astype(str).str.strip()
     df['Tipo de Título'] = df['Tipo de Título'].astype(str).str.strip()
 
-    df = df[(df['Empresa']!= '') & (df['Empresa']!= 'nan') & (df['Empresa']!= 'None')]
-    df = df[(df['Tipo de Título']!= '') & (df['Tipo de Título']!= 'nan') & (df['Tipo de Título']!= 'None')]
+    # Filtra mantendo apenas empresas e títulos válidos (remove 'nan', 'None', vazios)
+    invalidos = ['nan', 'none', '', 'null', '<na>']
+    df = df[~df['Empresa'].str.lower().isin(invalidos)]
+    df = df[~df['Tipo de Título'].str.lower().isin(invalidos)]
 
     if isinstance(data_ref, str):
         data_ref = date.fromisoformat(data_ref)
 
     if df.empty:
-        st.warning("Nenhuma linha válida para salvar")
+        st.warning("Nenhuma linha válida para salvar.")
         return
 
     db = SessionLocal()
     try:
         if modo == 'manutencao':
             for _, row in df.iterrows():
-                reg = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa == row['Empresa'], PosicaoDiaria.tipo_titulo == row['Tipo de Título']).first()
+                emp_val = str(row['Empresa'])
+                tipo_val = str(row['Tipo de Título'])
+                
+                reg = db.query(PosicaoDiaria).filter(
+                    PosicaoDiaria.data == data_ref, 
+                    PosicaoDiaria.empresa == emp_val, 
+                    PosicaoDiaria.tipo_titulo == tipo_val
+                ).first()
+
                 if reg:
                     reg.valor = float(row['Saldo'])
                     if hasattr(reg, 'qtd_veiculos'): reg.qtd_veiculos = int(row['Qtd'])
                     if hasattr(reg, 'valor_medio'): reg.valor_medio = float(row['ValorMedio'])
                     if hasattr(reg, 'criado_por'): reg.criado_por = usuario_logado
                 else:
-                    dados = dict(data=data_ref, empresa=row['Empresa'], tipo_titulo=row['Tipo de Título'], valor=float(row['Saldo']))
+                    dados = dict(
+                        data=data_ref, 
+                        empresa=emp_val, 
+                        tipo_titulo=tipo_val, 
+                        valor=float(row['Saldo'])
+                    )
                     if hasattr(PosicaoDiaria, 'qtd_veiculos'): dados['qtd_veiculos'] = int(row['Qtd'])
                     if hasattr(PosicaoDiaria, 'valor_medio'): dados['valor_medio'] = float(row['ValorMedio'])
                     if hasattr(PosicaoDiaria, 'criado_por'): dados['criado_por'] = usuario_logado
                     db.add(PosicaoDiaria(**dados))
         else:
+            # Modo 'novo': apaga o dia e recria
             db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
             objs = []
             for _, row in df.iterrows():
-                dados = dict(data=data_ref, empresa=row['Empresa'], tipo_titulo=row['Tipo de Título'], valor=float(row['Saldo']))
-                if hasattr(PosicaoDiaria, 'qtd_veiculos'): dados['qtd_veiculos'] = int(row['Qtd'])
-                if hasattr(PosicaoDiaria, 'valor_medio'): dados['valor_medio'] = float(row['ValorMedio'])
-                if hasattr(PosicaoDiaria, 'criado_por'): dados['criado_por'] = usuario_logado
+                dados = dict(
+                    data=data_ref,
+                    empresa=str(row['Empresa']),
+                    tipo_titulo=str(row['Tipo de Título']),
+                    valor=float(row['Saldo'])
+                )
+                if hasattr(PosicaoDiaria, 'qtd_veiculos'): 
+                    dados['qtd_veiculos'] = int(row['Qtd'])
+                if hasattr(PosicaoDiaria, 'valor_medio'): 
+                    dados['valor_medio'] = float(row['ValorMedio'])
+                if hasattr(PosicaoDiaria, 'criado_por'): 
+                    dados['criado_por'] = usuario_logado
+
                 objs.append(PosicaoDiaria(**dados))
+
             db.add_all(objs)
 
         db.commit()
@@ -337,90 +369,6 @@ def salvar_posicao_no_banco(df, data_ref, modo='novo'):
         st.dataframe(df)
     finally:
         db.close()
-
-# ========== ABA 1: LANÇAMENTO ==========
-with tab1:
-    st.markdown("### Lançamento e Manutenção")
-
-    if 'uploader_key' not in st.session_state:
-        st.session_state['uploader_key'] = 0
-
-    DATA_MANUTENCAO_DATE = st.date_input("📅 Data de Referência", value=DATA_REF_DATE, format="DD/MM/YYYY", key="data_manutencao")
-
-    uploaded_files = st.file_uploader(
-        "📁 Arraste os 4 arquivos RFN aqui. Se não subir nada, será apenas manutenção",
-        type=['xlsx', 'xls'],
-        accept_multiple_files=True,
-        key=f"uploader_tab1_{st.session_state['uploader_key']}"
-    )
-
-    valores_iniciais, valores_qtd_iniciais = carregar_valores_manuais_do_banco(DATA_MANUTENCAO_DATE)
-    valores_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-    valores_qtd_digitados = {'MATRIZ': {}, 'WS': {}, 'EUSEBIO': {}}
-
-    col_m, col_ws, col_e = st.columns(3)
-    empresas_col = {'MATRIZ': col_m, 'WS': col_ws, 'EUSEBIO': col_e}
-
-    for emp, col in empresas_col.items():
-        with col:
-            st.markdown(f"**{emp}**")
-            for item_chave, item_nome in ITENS_MANUAIS:
-                st.markdown(f"{item_nome}")
-                key_valor = f"{emp}_{item_chave}_edit_{DATA_MANUTENCAO_DATE.strftime('%Y%m%d')}_{st.session_state['uploader_key']}"
-                key_qtd = f"{emp}_QTD_{item_chave}_edit_{DATA_MANUTENCAO_DATE.strftime('%Y%m%d')}_{st.session_state['uploader_key']}"
-                valores_digitados[emp][item_chave] = st.text_input(label="", value=valores_iniciais[emp][item_chave], key=key_valor, label_visibility="collapsed")
-                if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS']:
-                    valores_qtd_digitados[emp][item_chave] = st.number_input("Qtd", value=int(valores_qtd_iniciais[emp][item_chave]), key=key_qtd, min_value=0, step=1)
-
-    if st.button(f"🚀 Processar e Salvar {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}", key="btn_processar_salvar", type="primary"):
-        lista_df = []
-        if uploaded_files:
-            lista_df = [
-                carregar_posicao_analitica(uploaded_files),
-                carregar_obrigacoes(uploaded_files),
-                carregar_creditos_nao_identificados(uploaded_files),
-                carregar_adiantamentos(uploaded_files)
-            ]
-
-        linhas_manuais = []
-        for emp in ['MATRIZ', 'WS', 'EUSEBIO']:
-            for item_chave, item_nome in ITENS_MANUAIS:
-                valor_str = valores_digitados[emp][item_chave]
-                valor_float = converter_valor_br(valor_str)
-                qtd = valores_qtd_digitados[emp].get(item_chave, 0) if item_chave in ['NOVOS PAGOS', 'USADOS PAGOS'] else 0
-                valor_medio = valor_float / qtd if qtd > 0 else 0.0
-                linhas_manuais.append({'Empresa': emp, 'Tipo de Título': item_chave, 'Saldo': valor_float, 'Qtd': qtd, 'ValorMedio': valor_medio})
-
-        lista_df.append(pd.DataFrame(linhas_manuais))
-        lista_df = [df for df in lista_df if not df.empty]
-
-        if lista_df:
-            df = pd.concat(lista_df, ignore_index=True)
-            df['Saldo'] = pd.to_numeric(df['Saldo'], errors='coerce').fillna(0.0)
-            df['Qtd'] = pd.to_numeric(df['Qtd'], errors='coerce').fillna(0)
-            df['ValorMedio'] = pd.to_numeric(df['ValorMedio'], errors='coerce').fillna(0.0)
-
-            empresas = df['Empresa'].unique()
-            novas_linhas = []
-            for emp in empresas:
-                trans = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'TRANSITORIA')]['Saldo'].sum()
-                adiant = df[(df['Empresa'] == emp) & (df['Tipo de Título'] == 'ADIANTAMENTOS')]['Saldo'].sum()
-                if trans > 0:
-                    dif = adiant - trans
-                    if dif!= 0:
-                        novas_linhas.append({'Tipo de Título': 'DIF_TRANS_ADIANT', 'Empresa': emp, 'Saldo': dif, 'Qtd': 0, 'ValorMedio': 0.0})
-
-            if novas_linhas:
-                df = pd.concat([df, pd.DataFrame(novas_linhas)], ignore_index=True)
-
-            salvar_posicao_no_banco(df, DATA_MANUTENCAO_DATE, modo='novo')
-
-            st.session_state['uploader_key'] += 1
-            st.cache_data.clear()
-            st.success(f"Processamento concluído para {DATA_MANUTENCAO_DATE.strftime('%d/%m/%Y')}!")
-            st.rerun()
-        else:
-            st.error("Nenhum dado para salvar. Envie arquivos ou preencha os manuais.")
 
 # ========== ABA 2: HISTÓRICO E EXPORTAÇÃO ==========
 with tab2:
