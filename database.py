@@ -32,6 +32,7 @@ class Usuarios(Base):
     email = Column(String, unique=True, index=True)
     senha_hash = Column(String)
     tipo = Column(String, default="usuario")
+    ativo = Column(Integer, default=1) # <-- ADICIONA ISSO
 
 def init_db():
     Base.metadata.create_all(bind=engine)
