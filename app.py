@@ -118,7 +118,8 @@ if st.session_state['logado']:
     if st.session_state['perfil'] == 'Admin':
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             st.markdown("#### Usuários Cadastrados")
-            db = SessionLocal()
+            #db = SessionLocal()
+            with SessionLocal() as db:
             users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
             db.close()
             selected_email = None
@@ -256,8 +257,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 def get_all_data():
-    return pd.read_sql_table('posicoes_diarias', engine)
-
+    with engine.connect() as conn:
+        return pd.read_sql("SELECT * FROM posicoes_diarias", conn)
+        
 tab1, tab2, tab3, tab4 = st.tabs(["Lançamento", "Histórico", "Manutenção","Graficos"])
 ITENS = [('CARTEIRA', 'CARTEIRA'), ('MERCADO PAGO', 'MERCADO PAGO'),('VEICULO', 'VEICULO'), ('SEGURADORA', 'SEGURADORA'),('GARANTIA', 'GARANTIA'), ('BANCOS', 'BANCOS'), ('CARTOES', 'CARTOES'),('NOVOS PAGOS', 'NOVOS PAGOS'),('USADOS PAGOS', 'USADOS PAGOS'),('FUNDAO NOVOS', 'FUNDAO NOVOS'),('FIDIC', 'FIDIC'), ('H.B.PECAS', 'H.B.PECAS'),('ESTOQUE PECAS', 'ESTOQUE PECAS'), ('OBRIG. A PAGA', 'OBRIG. A PAGA'),('ADIANTAMENTOS', 'ADIANTAMENTOS'),('TRANSITORIA', 'TRANSITORIA'), ('DIF_TRANS_ADIANT', 'DIF_TRANS_ADIANT')]
 ITENS_MANUAIS = [('NOVOS PAGOS', 'NOVOS PAGOS'),('USADOS PAGOS', 'USADOS PAGOS'),('FUNDAO NOVOS', 'FUNDAO NOVOS'),('FIDIC', 'FIDIC'), ('H.B.PECAS', 'H.B.PECAS'),('ESTOQUE PECAS', 'ESTOQUE PECAS')]
@@ -530,7 +532,11 @@ with tab4:
 
         if not df_filtrado.empty:
             df_total_valor = df_filtrado.groupby(['data', 'empresa'])['valor'].sum().reset_index()
-            df_total_qtd = df_filtrado.groupby(['data', 'empresa'])[getattr(PosicaoDiaria, 'qtd_veiculos', 'qtd_veiculos')].sum().reset_index() if hasattr(PosicaoDiaria, 'qtd_veiculos') else pd.DataFrame()
+            #df_total_qtd = df_filtrado.groupby(['data', 'empresa'])[getattr(PosicaoDiaria, 'qtd_veiculos', 'qtd_veiculos')].sum().reset_index() if hasattr(PosicaoDiaria, 'qtd_veiculos') else pd.DataFrame()
+            if 'qtd_veiculos' in df_filtrado.columns:
+                df_total_qtd = df_filtrado.groupby(['data', 'empresa'])['qtd_veiculos'].sum().reset_index()
+            else:
+                df_total_qtd = pd.DataFrame()
             data_hoje = df_filtrado['data'].max()
             df_dia = df_filtrado[df_filtrado['data'] == data_hoje]
 
