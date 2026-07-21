@@ -3,13 +3,13 @@ from sqlalchemy import create_engine, Column, Integer, String, Float, Date, Bool
 from sqlalchemy.orm import sessionmaker, declarative_base
 import streamlit as st
 
+# Pega a URL dos Secrets do Streamlit
 DATABASE_URL = st.secrets["DATABASE_URL"]
 
 engine = create_engine(
     DATABASE_URL,
-    pool_pre_ping=True,  # <-- TESTA A CONEXÃO ANTES DE USAR. Evita o erro de SSL
-    pool_recycle=300,    # <-- Recicla a conexão a cada 5 min
-    connect_args={"sslmode": "require"} if "sslmode" not in DATABASE_URL else {} # Bom pra Neon/Supabase
+    pool_pre_ping=True,
+    connect_args={"sslmode": "require"}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -34,9 +34,8 @@ class Usuarios(Base):
     nome = Column(String(100))
     perfil = Column(String(20), default="Usuario") 
     ativo = Column(Boolean, default=True)
-    
 
 def init_db():
     Base.metadata.create_all(bind=engine)
 
-init_db()
+# NÃO chama init_db() aqui. Vamos chamar só 1 vez no app.py
