@@ -22,102 +22,54 @@ from processamento_rfn import (
 from utils import converter_valor_br, detectar_empresa, normalizar_tipo
 
 st.set_page_config(page_title="Posição Financeira Diária", layout="wide")
-
 init_db()
-
 
 def gerar_hash(senha):
     return hashlib.sha256(senha.encode()).hexdigest()
 
-
 def gerar_senha_aleatoria(tamanho=8):
-    return "".join(
-        random.choice(string.ascii_letters + string.digits) for _ in range(tamanho)
-    )
-
+    return "".join(random.choice(string.ascii_letters + string.digits) for _ in range(tamanho))
 
 def formatar_br(valor):
     if valor is None or pd.isna(valor):
         valor = 0.0
     return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
-
 EMPRESAS = ["MATRIZ", "WS", "EUSEBIO"]
 ITENS_ORDEM = [
-    "CARTEIRA",
-    "MERCADO PAGO",
-    "VEICULO",
-    "SEGURADORA",
-    "GARANTIA",
-    "BANCOS",
-    "CARTOES",
-    "NOVOS PAGOS",
-    "USADOS PAGOS",
-    "FUNDAO NOVOS",
-    "FIDIC",
-    "H.B.PECAS",
-    "ESTOQUE PECAS",
-    "OBRIG. A PAGA",
-    "ADIANTAMENTOS",
-    "TRANSITORIA",
-    "DIF_TRANS_ADIANT",
+    "CARTEIRA","MERCADO PAGO","VEICULO","SEGURADORA","GARANTIA","BANCOS","CARTOES","NOVOS PAGOS","USADOS PAGOS","FUNDAO NOVOS","FIDIC","H.B.PECAS","ESTOQUE PECAS","OBRIG. A PAGA","ADIANTAMENTOS","TRANSITORIA","DIF_TRANS_ADIANT",
 ]
 
-#------ Monta dashBoard ------
 @st.cache_data(ttl=10)
 def montar_df_dashboard(data_ref, empresas):
     with SessionLocal() as db:
-        dados = (
-            db.query(PosicaoDiaria)
-            .filter(
-                PosicaoDiaria.data == data_ref,
-                PosicaoDiaria.empresa.in_(empresas),
-            )
-            .all()
-        )
-        if not dados:
-            return None
-
+        dados = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa.in_(empresas)).all()
+        if not dados: return None
         df_pivot = pd.DataFrame(0.0, index=ITENS_ORDEM, columns=empresas)
         df_qtd = pd.DataFrame(0, index=ITENS_ORDEM, columns=empresas)
-
         for d in dados:
             if d.tipo_titulo in ITENS_ORDEM and d.empresa in empresas:
                 valor_float = float(d.valor or 0.0)
                 df_pivot.loc[d.tipo_titulo, d.empresa] = valor_float
-                df_qtd.loc[d.tipo_titulo, d.empresa] = (
-                    getattr(d, "qtd_veiculos", 0) or 0
-                )
-
+                df_qtd.loc[d.tipo_titulo, d.empresa] = getattr(d, "qtd_veiculos", 0) or 0
     dados_tabela = []
     for item in ITENS_ORDEM:
         linha = {"DESCRICAO": item}
         for emp in empresas:
-            valor = df_pivot.loc[item, emp]
-            qtd = df_qtd.loc[item, emp]
+            valor = df_pivot.loc[item, emp]; qtd = df_qtd.loc[item, emp]
             if item in ["NOVOS PAGOS", "USADOS PAGOS"]:
                 linha[emp] = f"{formatar_br(valor).replace('R$ ', '')} - {qtd}"
-            else:
-                linha[emp] = formatar_br(valor)
+            else: linha[emp] = formatar_br(valor)
         dados_tabela.append(linha)
-
-    # --- CÁLCULO DA LINHA TOTAL (REGRA LÍQUIDA APLICADA) ---
     linha_total = {"DESCRICAO": "TOTAL"}
     for emp in empresas:
         total_emp = 0.0
         for item in df_pivot.index:
-            val = df_pivot.loc[item, emp]
-            item_upper = str(item).upper()
-
-            if "OBRIG" in item_upper:
-                total_emp -= abs(val)  # Subtrai Obrigações
-            elif item_upper in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
-                pass  # Zera/Ignora Transitórias
-            else:
-                total_emp += abs(val)  # Soma Ativos
-
+            val = df_pivot.loc[item, emp]; item_upper = str(item).upper()
+            if "OBRIG" in item_upper: total_emp -= abs(val)
+            elif item_upper in ["TRANSITORIA", "DIF_TRANS_ADIANT"]: pass
+            else: total_emp += abs(val)
         linha_total[emp] = formatar_br(total_emp)
-
     dados_tabela.append(linha_total)
     return pd.DataFrame(dados_tabela)
 
@@ -130,959 +82,370 @@ def tela_login():
         if entrar:
             senha_hash = gerar_hash(senha)
             with SessionLocal() as db:
-                user = (
-                    db.query(Usuarios)
-                    .filter_by(email=email, senha_hash=senha_hash, ativo=True)
-                    .first()
-                )
-
+                user = db.query(Usuarios).filter_by(email=email, senha_hash=senha_hash, ativo=True).first()
             if user:
                 st.session_state["logado"] = True
                 st.session_state["usuario"] = user.nome
                 st.session_state["email"] = user.email
                 st.session_state["perfil"] = user.perfil
                 st.rerun()
-            else:
-                st.error("Email ou senha inválidos")
+            else: st.error("Email ou senha inválidos")
 
-
-if "logado" not in st.session_state:
-    st.session_state["logado"] = False
-
+if "logado" not in st.session_state: st.session_state["logado"] = False
 if not st.session_state["logado"]:
     tela_login()
     st.stop()
 
 if st.session_state["logado"]:
     with SessionLocal() as db:
-        user_db = (
-            db.query(Usuarios)
-            .filter_by(email=st.session_state["email"])
-            .first()
-        )
-        st.session_state["perfil"] = (
-            getattr(user_db, "perfil", "Usuario") if user_db else "Usuario"
-        )
+        user_db = db.query(Usuarios).filter_by(email=st.session_state["email"]).first()
+        st.session_state["perfil"] = getattr(user_db, "perfil", "Usuario") if user_db else "Usuario"
 
     st.sidebar.write(f"Perfil: {st.session_state['perfil']}")
 
     if st.session_state["perfil"] == "Admin":
         with st.sidebar.expander("👥 Gerenciar Usuários"):
             st.markdown("#### Usuários Cadastrados")
-
-            with SessionLocal() as db:
-                users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
-
+            with SessionLocal() as db: users = db.query(Usuarios).order_by(Usuarios.email.desc()).all()
             selected_email = None
             if users:
-                df_users = pd.DataFrame(
-                    [
-                        {
-                            "Email": u.email,
-                            "Nome": u.nome,
-                            "Perfil": getattr(u, "perfil", "Usuario"),
-                            "Ativo": "Sim" if u.ativo else "Não",
-                        }
-                        for u in users
-                    ]
-                )
-                selected = st.dataframe(
-                    df_users,
-                    width="stretch",
-                    hide_index=True,
-                    height=200,
-                    on_select="rerun",
-                    selection_mode="single-row",
-                )
-                if selected.get("selection", {}).get("rows"):
-                    selected_email = df_users.iloc[
-                        selected["selection"]["rows"][0]
-                    ]["Email"]
-            else:
-                st.warning("Nenhum usuário cadastrado")
-
+                df_users = pd.DataFrame([{"Email": u.email,"Nome": u.nome,"Perfil": getattr(u, "perfil", "Usuario"),"Ativo": "Sim" if u.ativo else "Não",} for u in users])
+                selected = st.dataframe(df_users, width="stretch", hide_index=True, height=200, on_select="rerun", selection_mode="single-row",)
+                if selected.get("selection", {}).get("rows"): selected_email = df_users.iloc[selected["selection"]["rows"][0]]["Email"]
+            else: st.warning("Nenhum usuário cadastrado")
             st.divider()
             st.markdown("#### Dados do Usuário")
             user_edit = None
             if selected_email:
-                with SessionLocal() as db:
-                    user_edit = (
-                        db.query(Usuarios)
-                        .filter(Usuarios.email == selected_email)
-                        .first()
-                    )
-
+                with SessionLocal() as db: user_edit = db.query(Usuarios).filter(Usuarios.email == selected_email).first()
             with st.form("form_usuario"):
-                nome = st.text_input(
-                    "Nome", value=user_edit.nome if user_edit else ""
-                )
-                email = st.text_input(
-                    "Email",
-                    value=user_edit.email if user_edit else "",
-                    disabled=bool(user_edit),
-                )
-                perfil_val = (
-                    getattr(user_edit, "perfil", "Usuario")
-                    if user_edit
-                    else "Usuario"
-                )
-                perfil = st.selectbox(
-                    "Perfil",
-                    ["Usuario", "Admin"],
-                    index=0 if perfil_val == "Usuario" else 1,
-                )
-                ativo = st.checkbox(
-                    "Ativo", value=user_edit.ativo if user_edit else True
-                )
-
+                nome = st.text_input("Nome", value=user_edit.nome if user_edit else "")
+                email = st.text_input("Email", value=user_edit.email if user_edit else "", disabled=bool(user_edit),)
+                perfil_val = getattr(user_edit, "perfil", "Usuario") if user_edit else "Usuario"
+                perfil = st.selectbox("Perfil", ["Usuario", "Admin", "Visualizador"], index=["Usuario", "Admin", "Visualizador"].index(perfil_val),)
+                ativo = st.checkbox("Ativo", value=user_edit.ativo if user_edit else True)
                 col1, col2 = st.columns(2)
-                btn_salvar = col1.form_submit_button(
-                    "💾 Salvar", use_container_width=True
-                )
-                btn_senha = col2.form_submit_button(
-                    "🔑 Nova Senha",
-                    use_container_width=True,
-                    disabled=not bool(user_edit),
-                )
-
-            # --- TRATAMENTO DO BOTÃO SALVAR ---
+                btn_salvar = col1.form_submit_button("💾 Salvar", use_container_width=True)
+                btn_senha = col2.form_submit_button("🔑 Nova Senha", use_container_width=True, disabled=not bool(user_edit),)
             if btn_salvar:
                 with SessionLocal() as db:
                     if user_edit:
-                        u_db = (
-                            db.query(Usuarios)
-                            .filter(Usuarios.email == user_edit.email)
-                            .first()
-                        )
-                        if u_db:
-                            u_db.nome = nome
-                            if hasattr(u_db, "perfil"):
-                                u_db.perfil = perfil
-                            u_db.ativo = ativo
-                            msg = "Usuário atualizado com sucesso!"
+                        u_db = db.query(Usuarios).filter(Usuarios.email == user_edit.email).first()
+                        if u_db: u_db.nome = nome; u_db.perfil = perfil; u_db.ativo = ativo; msg = "Usuário atualizado com sucesso!"
                     else:
-                        if db.query(Usuarios).filter_by(email=email).first():
-                            st.error("Erro: Este email já está cadastrado")
-                            st.stop()
+                        if db.query(Usuarios).filter_by(email=email).first(): st.error("Erro: Este email já está cadastrado"); st.stop()
                         senha_temp = gerar_senha_aleatoria()
-                        novo = Usuarios(
-                            nome=nome,
-                            email=email,
-                            senha_hash=gerar_hash(senha_temp),
-                            perfil=perfil,
-                            ativo=ativo,
-                        )
-                        db.add(novo)
-                        msg = f"Usuário cadastrado! Senha inicial: `{senha_temp}`"
+                        novo = Usuarios(nome=nome, email=email, senha_hash=gerar_hash(senha_temp), perfil=perfil, ativo=ativo,)
+                        db.add(novo); msg = f"Usuário cadastrado! Senha inicial: `{senha_temp}`"
                     db.commit()
-                st.success(msg)
-                st.rerun()
-
-            # --- TRATAMENTO DO BOTÃO NOVA SENHA ---
+                st.success(msg); st.rerun()
             if btn_senha and user_edit:
                 nova_senha_temp = gerar_senha_aleatoria()
                 with SessionLocal() as db:
-                    u_db = (
-                        db.query(Usuarios)
-                        .filter(Usuarios.email == user_edit.email)
-                        .first()
-                    )
-                    if u_db:
-                        u_db.senha_hash = gerar_hash(nova_senha_temp)
-                        db.commit()
-                        st.warning(
-                            f"🔑 Nova senha gerada para **{u_db.nome}**: `{nova_senha_temp}`"
-                        )
+                    u_db = db.query(Usuarios).filter(Usuarios.email == user_edit.email).first()
+                    if u_db: u_db.senha_hash = gerar_hash(nova_senha_temp); db.commit(); st.warning(f"🔑 Nova senha gerada para **{u_db.nome}**: `{nova_senha_temp}`")
 
     st.sidebar.divider()
     st.sidebar.markdown("### Data de Referência")
-    DATA_REF_DATE = st.sidebar.date_input(
-        "Selecione a Data",
-        value=date.today(),
-        format="DD/MM/YYYY",
-        key="data_lancamento",
-    )
+    DATA_REF_DATE = st.sidebar.date_input("Selecione a Data", value=date.today(), format="DD/MM/YYYY", key="data_lancamento",)
     st.sidebar.markdown("### Filtros")
-    empresas_selecionadas = st.sidebar.multiselect(
-        "Empresas",
-        ["MATRIZ", "WS", "EUSEBIO"],
-        default=["MATRIZ", "WS", "EUSEBIO"],
-    )
+    empresas_selecionadas = st.sidebar.multiselect("Empresas", ["MATRIZ", "WS", "EUSEBIO"], default=["MATRIZ", "WS", "EUSEBIO"],)
     st.sidebar.divider()
     st.sidebar.markdown("### Resumo do Dia")
-
     col_m, col_ws, col_e = st.sidebar.columns(3)
     empresas_cards = {"MATRIZ": col_m, "WS": col_ws, "EUSEBIO": col_e}
 
     @st.cache_data(ttl=10)
     def get_total_empresa(data, empresa):
         with SessionLocal() as db:
-            regs = (
-                db.query(PosicaoDiaria)
-                .filter(
-                    PosicaoDiaria.data == data, PosicaoDiaria.empresa == empresa
-                )
-                .all()
-            )
-
+            regs = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data, PosicaoDiaria.empresa == empresa).all()
             total = 0.0
             for r in regs:
                 valor_float = float(r.valor or 0.0)
-
-                if r.tipo_titulo == "OBRIG. A PAGA":
-                    total -= valor_float
-                elif r.tipo_titulo not in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
-                    total += valor_float
-
+                if r.tipo_titulo == "OBRIG. A PAGA": total -= valor_float
+                elif r.tipo_titulo not in ["TRANSITORIA", "DIF_TRANS_ADIANT"]: total += valor_float
             return total
 
     @st.cache_data(ttl=10)
     def get_variacao_empresa(data_atual, data_anterior, empresa):
-        if not data_anterior:
-            return 0.0
+        if not data_anterior: return 0.0
         total_atual = get_total_empresa(data_atual, empresa)
         total_anterior = get_total_empresa(data_anterior, empresa)
-        if total_anterior == 0:
-            return 0.0
+        if total_anterior == 0: return 0.0
         return ((total_atual - total_anterior) / total_anterior) * 100
 
     for emp, col in empresas_cards.items():
-        if emp not in empresas_selecionadas:
-            continue
+        if emp not in empresas_selecionadas: continue
         with col:
             total_hoje = get_total_empresa(DATA_REF_DATE, emp)
             data_ontem_date = DATA_REF_DATE - timedelta(days=1)
             variacao = get_variacao_empresa(DATA_REF_DATE, data_ontem_date, emp)
             delta_cor = "normal" if variacao >= 0 else "inverse"
-            st.metric(
-                label=f"TOTAL {emp}",
-                value=formatar_br(total_hoje),
-                delta=f"{variacao:.2f}%",
-                delta_color=delta_cor,
-            )
+            st.metric(label=f"TOTAL {emp}", value=formatar_br(total_hoje), delta=f"{variacao:.2f}%", delta_color=delta_cor)
 
+# CSS GLOBAL + TITULO GERAL
 st.markdown(
-    """
-    <style>
-       .main-title {
-            font-size: 20px;
-            font-weight: 600;
-            margin-top: -25px;
-            margin-bottom: 8px;
-        }
-        [data-testid="stMetricValue"] {
-            font-size: 18px!important;
-            display: flex!important;
-            align-items: baseline!important;
-            gap: 3px!important;
-        }
-        [data-testid="stMetricValue"]::before {
-            content: "R$ ";
-            font-size: 11px!important;
-            font-weight: 600;
-        }
-        [data-testid="stMetricLabel"] {
-            font-size: 10px!important;
-        }
-    </style>
-    <h1 class="main-title">Dashboard Financeira Diária</h1>
-""",
-    unsafe_allow_html=True,
+    """<style>
+      .main-title {font-size: 24px;font-weight: 700;margin-top: -10px;margin-bottom: 15px;}
+        [data-testid="stMetricValue"] {font-size: 18px!important;display: flex!important;align-items: baseline!important;gap: 3px!important;}
+        [data-testid="stMetricValue"]::before {content: "R$ ";font-size: 11px!important;font-weight: 600;}
+        [data-testid="stMetricLabel"] {font-size: 10px!important;}
+    </style>""", unsafe_allow_html=True,
 )
+
+# TITULO ACIMA DAS TABS
+st.markdown('<h1 class="main-title">Dashboard Financeira Diária</h1>', unsafe_allow_html=True)
+
 def calcular_total_posicao_correto(df):
-    """
-    Calcula o Total Líquido aplicando as regras de negócio:
-    - OBRIGAÇÕES / OBRIG. A PAGA: Subtrai (-)
-    - TRANSITORIA e DIF_TRANS_ADIANT: Ignora (0.0)
-    - Demais títulos: Soma (+)
-    """
-    if df is None or df.empty:
-        return 0.0
-
+    if df is None or df.empty: return 0.0
     df_calc = df.copy()
-
-    # Identifica colunas
-    col_tipo = (
-        "Tipo de Título"
-        if "Tipo de Título" in df_calc.columns
-        else ("tipo_titulo" if "tipo_titulo" in df_calc.columns else None)
-    )
-    col_saldo = (
-        "Saldo"
-        if "Saldo" in df_calc.columns
-        else ("valor" if "valor" in df_calc.columns else None)
-    )
-
-    if not col_tipo or not col_saldo:
-        return 0.0
-
-    df_calc["tipo_clean"] = (
-        df_calc[col_tipo].astype(str).str.strip().str.upper()
-    )
-
+    col_tipo = ("Tipo de Título" if "Tipo de Título" in df_calc.columns else ("tipo_titulo" if "tipo_titulo" in df_calc.columns else None))
+    col_saldo = ("Saldo" if "Saldo" in df_calc.columns else ("valor" if "valor" in df_calc.columns else None))
+    if not col_tipo or not col_saldo: return 0.0
+    df_calc["tipo_clean"] = df_calc[col_tipo].astype(str).str.strip().str.upper()
     def aplicar_regra(row):
-        tipo = row["tipo_clean"]
-        val = float(row[col_saldo] or 0.0)
-
-        if "OBRIG" in tipo:
-            return -abs(val)  # Subtrai obrigações
-        elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
-            return 0.0  # Desconsidera da soma
-        else:
-            return abs(val)  # Soma demais ativos
-
+        tipo = row["tipo_clean"]; val = float(row[col_saldo] or 0.0)
+        if "OBRIG" in tipo: return -abs(val)
+        elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]: return 0.0
+        else: return abs(val)
     df_calc["valor_correto"] = df_calc.apply(aplicar_regra, axis=1)
     return float(df_calc["valor_correto"].sum())
 
 def get_all_data():
-    with engine.connect() as conn:
-        return pd.read_sql("SELECT * FROM posicoes_diarias", conn)
+    with engine.connect() as conn: return pd.read_sql("SELECT * FROM posicoes_diarias", conn)
 
+# TABS DINAMICAS POR PERFIL
+PERFIS_ABAS = {
+    "Admin": ["Lançamento", "Histórico", "Manutenção", "Graficos"],
+    "Usuario": ["Lançamento", "Histórico", "Manutenção", "Graficos"],
+    "Visualizador": ["Histórico", "Graficos"]
+}
+abas_permitidas = PERFIS_ABAS.get(st.session_state["perfil"], ["Histórico", "Graficos"])
+tabs = st.tabs(abas_permitidas)
+tab_dict = {nome: tab for nome, tab in zip(abas_permitidas, tabs)}
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Lançamento", "Histórico", "Manutenção", "Graficos"]
-)
-ITENS = [
-    ("CARTEIRA", "CARTEIRA"),
-    ("MERCADO PAGO", "MERCADO PAGO"),
-    ("VEICULO", "VEICULO"),
-    ("SEGURADORA", "SEGURADORA"),
-    ("GARANTIA", "GARANTIA"),
-    ("BANCOS", "BANCOS"),
-    ("CARTOES", "CARTOES"),
-    ("NOVOS PAGOS", "NOVOS PAGOS"),
-    ("USADOS PAGOS", "USADOS PAGOS"),
-    ("FUNDAO NOVOS", "FUNDAO NOVOS"),
-    ("FIDIC", "FIDIC"),
-    ("H.B.PECAS", "H.B.PECAS"),
-    ("ESTOQUE PECAS", "ESTOQUE PECAS"),
-    ("OBRIG. A PAGA", "OBRIG. A PAGA"),
-    ("ADIANTAMENTOS", "ADIANTAMENTOS"),
-    ("TRANSITORIA", "TRANSITORIA"),
-    ("DIF_TRANS_ADIANT", "DIF_TRANS_ADIANT"),
-]
-ITENS_MANUAIS = [
-    ("NOVOS PAGOS", "NOVOS PAGOS"),
-    ("USADOS PAGOS", "USADOS PAGOS"),
-    ("FUNDAO NOVOS", "FUNDAO NOVOS"),
-    ("FIDIC", "FIDIC"),
-    ("H.B.PECAS", "H.B.PECAS"),
-    ("ESTOQUE PECAS", "ESTOQUE PECAS"),
-]
-
+ITENS = [("CARTEIRA", "CARTEIRA"),("MERCADO PAGO", "MERCADO PAGO"),("VEICULO", "VEICULO"),("SEGURADORA", "SEGURADORA"),("GARANTIA", "GARANTIA"),("BANCOS", "BANCOS"),("CARTOES", "CARTOES"),("NOVOS PAGOS", "NOVOS PAGOS"),("USADOS PAGOS", "USADOS PAGOS"),("FUNDAO NOVOS", "FUNDAO NOVOS"),("FIDIC", "FIDIC"),("H.B.PECAS", "H.B.PECAS"),("ESTOQUE PECAS", "ESTOQUE PECAS"),("OBRIG. A PAGA", "OBRIG. A PAGA"),("ADIANTAMENTOS", "ADIANTAMENTOS"),("TRANSITORIA", "TRANSITORIA"),("DIF_TRANS_ADIANT", "DIF_TRANS_ADIANT"),]
+ITENS_MANUAIS = [("NOVOS PAGOS", "NOVOS PAGOS"),("USADOS PAGOS", "USADOS PAGOS"),("FUNDAO NOVOS", "FUNDAO NOVOS"),("FIDIC", "FIDIC"),("H.B.PECAS", "H.B.PECAS"),("ESTOQUE PECAS", "ESTOQUE PECAS"),]
 
 def carregar_valores_manuais_do_banco(data_ref):
-    if isinstance(data_ref, str):
-        data_ref = date.fromisoformat(data_ref)
-    valores = {
-        "MATRIZ": {k: 0.0 for k, _ in ITENS_MANUAIS},
-        "WS": {k: 0.0 for k, _ in ITENS_MANUAIS},
-        "EUSEBIO": {k: 0.0 for k, _ in ITENS_MANUAIS},
-    }
-    valores_qtd = {
-        "MATRIZ": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},
-        "WS": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},
-        "EUSEBIO": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},
-    }
-
+    if isinstance(data_ref, str): data_ref = date.fromisoformat(data_ref)
+    valores = {"MATRIZ": {k: 0.0 for k, _ in ITENS_MANUAIS},"WS": {k: 0.0 for k, _ in ITENS_MANUAIS},"EUSEBIO": {k: 0.0 for k, _ in ITENS_MANUAIS},}
+    valores_qtd = {"MATRIZ": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},"WS": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},"EUSEBIO": {"NOVOS PAGOS": 0, "USADOS PAGOS": 0},}
     with SessionLocal() as db:
-        registros = (
-            db.query(PosicaoDiaria)
-            .filter(
-                PosicaoDiaria.data == data_ref,
-                PosicaoDiaria.tipo_titulo.in_([k for k, _ in ITENS_MANUAIS]),
-            )
-            .all()
-        )
+        registros = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.tipo_titulo.in_([k for k, _ in ITENS_MANUAIS]),).all()
         for reg in registros:
-            if reg.empresa in valores and reg.tipo_titulo in valores[reg.empresa]:
-                valores[reg.empresa][reg.tipo_titulo] = float(reg.valor or 0.0)
-            if (
-                reg.empresa in valores_qtd
-                and reg.tipo_titulo in valores_qtd[reg.empresa]
-            ):
-                valores_qtd[reg.empresa][reg.tipo_titulo] = int(
-                    getattr(reg, "qtd_veiculos", 0) or 0
-                )
+            if reg.empresa in valores and reg.tipo_titulo in valores[reg.empresa]: valores[reg.empresa][reg.tipo_titulo] = float(reg.valor or 0.0)
+            if reg.empresa in valores_qtd and reg.tipo_titulo in valores_qtd[reg.empresa]: valores_qtd[reg.empresa][reg.tipo_titulo] = int(getattr(reg, "qtd_veiculos", 0) or 0)
     return valores, valores_qtd
 
-# Salvar registro em banco
-# Salvar registro em banco
 def salvar_posicao_no_banco(df, data_ref, modo="novo"):
     usuario_logado = st.session_state.get("email", "sistema")
-    df = df.copy()
-
-    # 1. REMOVE DUPLICIDADE DE NOME DAS COLUNAS PRIMEIRO (Garante que cada coluna seja única)
-    df = df.loc[:, ~df.columns.duplicated()].copy()
-
-    # 2. Garantir existência das colunas necessárias
-    if "Qtd" not in df.columns:
-        df["Qtd"] = 0
-    if "ValorMedio" not in df.columns:
-        df["ValorMedio"] = 0.0
-
-    # 3. Converter valores numéricos tratando NaNs e Infs (Agora é 100% garantido ser uma Series)
+    df = df.copy(); df = df.loc[:, ~df.columns.duplicated()].copy()
+    if "Qtd" not in df.columns: df["Qtd"] = 0
+    if "ValorMedio" not in df.columns: df["ValorMedio"] = 0.0
     df["Saldo"] = pd.to_numeric(df["Saldo"], errors="coerce").fillna(0.0)
     df["Qtd"] = pd.to_numeric(df["Qtd"], errors="coerce").fillna(0).astype(int)
-    df["ValorMedio"] = (
-        pd.to_numeric(df["ValorMedio"], errors="coerce")
-        .fillna(0.0)
-        .replace([np.inf, -np.inf], 0.0)
-    )
-
-    # 4. Tratar e limpar colunas de texto
+    df["ValorMedio"] = pd.to_numeric(df["ValorMedio"], errors="coerce").fillna(0.0).replace([np.inf, -np.inf], 0.0)
     df["Empresa"] = df["Empresa"].astype(str).str.strip()
     df["Tipo de Título"] = df["Tipo de Título"].astype(str).str.strip()
-
-    # Filtra mantendo apenas empresas e títulos válidos
     invalidos = ["nan", "none", "", "null", "<na>"]
     df = df[~df["Empresa"].str.lower().isin(invalidos)]
     df = df[~df["Tipo de Título"].str.lower().isin(invalidos)]
-
-    if isinstance(data_ref, str):
-        data_ref = date.fromisoformat(data_ref)
-
-    if df.empty:
-        st.warning("Nenhuma linha válida para salvar.")
-        return
-
+    if isinstance(data_ref, str): data_ref = date.fromisoformat(data_ref)
+    if df.empty: st.warning("Nenhuma linha válida para salvar."); return
     db = SessionLocal()
     try:
         if modo == "manutencao":
             for _, row in df.iterrows():
-                emp_val = str(row["Empresa"])
-                tipo_val = str(row["Tipo de Título"])
-
-                reg = (
-                    db.query(PosicaoDiaria)
-                    .filter(
-                        PosicaoDiaria.data == data_ref,
-                        PosicaoDiaria.empresa == emp_val,
-                        PosicaoDiaria.tipo_titulo == tipo_val,
-                    )
-                    .first()
-                )
-
+                emp_val = str(row["Empresa"]); tipo_val = str(row["Tipo de Título"])
+                reg = db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref, PosicaoDiaria.empresa == emp_val, PosicaoDiaria.tipo_titulo == tipo_val,).first()
                 if reg:
                     reg.valor = float(row["Saldo"])
-                    if hasattr(reg, "qtd_veiculos"):
-                        reg.qtd_veiculos = int(row["Qtd"])
-                    if hasattr(reg, "valor_medio"):
-                        reg.valor_medio = float(row["ValorMedio"])
-                    if hasattr(reg, "criado_por"):
-                        reg.criado_por = usuario_logado
+                    if hasattr(reg, "qtd_veiculos"): reg.qtd_veiculos = int(row["Qtd"])
+                    if hasattr(reg, "valor_medio"): reg.valor_medio = float(row["ValorMedio"])
+                    if hasattr(reg, "criado_por"): reg.criado_por = usuario_logado
                 else:
-                    dados = dict(
-                        data=data_ref,
-                        empresa=emp_val,
-                        tipo_titulo=tipo_val,
-                        valor=float(row["Saldo"]),
-                    )
-                    if hasattr(PosicaoDiaria, "qtd_veiculos"):
-                        dados["qtd_veiculos"] = int(row["Qtd"])
-                    if hasattr(PosicaoDiaria, "valor_medio"):
-                        dados["valor_medio"] = float(row["ValorMedio"])
-                    if hasattr(PosicaoDiaria, "criado_por"):
-                        dados["criado_por"] = usuario_logado
+                    dados = dict(data=data_ref, empresa=emp_val, tipo_titulo=tipo_val, valor=float(row["Saldo"]))
+                    if hasattr(PosicaoDiaria, "qtd_veiculos"): dados["qtd_veiculos"] = int(row["Qtd"])
+                    if hasattr(PosicaoDiaria, "valor_medio"): dados["valor_medio"] = float(row["ValorMedio"])
+                    if hasattr(PosicaoDiaria, "criado_por"): dados["criado_por"] = usuario_logado
                     db.add(PosicaoDiaria(**dados))
         else:
-            db.query(PosicaoDiaria).filter(
-                PosicaoDiaria.data == data_ref
-            ).delete()
+            db.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_ref).delete()
             objs = []
             for _, row in df.iterrows():
-                dados = dict(
-                    data=data_ref,
-                    empresa=str(row["Empresa"]),
-                    tipo_titulo=str(row["Tipo de Título"]),
-                    valor=float(row["Saldo"]),
-                )
-                if hasattr(PosicaoDiaria, "qtd_veiculos"):
-                    dados["qtd_veiculos"] = int(row["Qtd"])
-                if hasattr(PosicaoDiaria, "valor_medio"):
-                    dados["valor_medio"] = float(row["ValorMedio"])
-                if hasattr(PosicaoDiaria, "criado_por"):
-                    dados["criado_por"] = usuario_logado
-
+                dados = dict(data=data_ref, empresa=str(row["Empresa"]), tipo_titulo=str(row["Tipo de Título"]), valor=float(row["Saldo"]))
+                if hasattr(PosicaoDiaria, "qtd_veiculos"): dados["qtd_veiculos"] = int(row["Qtd"])
+                if hasattr(PosicaoDiaria, "valor_medio"): dados["valor_medio"] = float(row["ValorMedio"])
+                if hasattr(PosicaoDiaria, "criado_por"): dados["criado_por"] = usuario_logado
                 objs.append(PosicaoDiaria(**dados))
-
             db.add_all(objs)
-
-        db.commit()
-        st.cache_data.clear()
-        #st.success(f"{len(df)} registros salvos com sucesso!")
+        db.commit(); st.cache_data.clear()
     except Exception as e:
-        db.rollback()
-        st.error(f"Erro ao salvar: {e}")
-        st.dataframe(df)
-    finally:
-        db.close()
-        
-# --- POPUP DE CONFIRMAÇÃO DE SALVAMENTO ---
+        db.rollback(); st.error(f"Erro ao salvar: {e}"); st.dataframe(df)
+    finally: db.close()
+
 @st.dialog("✅ Registros Salvos com Sucesso!")
 def exibir_popup_sucesso(qtd_registros, data_ref):
-    st.markdown(
-        f"""
-        Os lançamentos para a data **{data_ref.strftime('%d/%m/%Y')}** foram processados e gravados com sucesso no banco de dados!
-
-        - **Total de registros salvos/atualizados:** `{qtd_registros}`
-        """
-    )
+    st.markdown(f"Os lançamentos para a data **{data_ref.strftime('%d/%m/%Y')}** foram processados e gravados com sucesso no banco de dados!\n\n- **Total de registros salvos/atualizados:** `{qtd_registros}`")
     st.divider()
-    if st.button("👍 Ok, entendi", type="primary", use_container_width=True):
-        st.rerun()
+    if st.button("👍 Ok, entendi", type="primary", use_container_width=True): st.rerun()
 
 # ========== ABA 1: LANÇAMENTO ==========
-with tab1:
-    st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
+if "Lançamento" in tab_dict:
+    with tab_dict["Lançamento"]:
+        #st.markdown('<h1 class="main-title">Dashboard Financeira Diária</h1>', unsafe_allow_html=True) # CORRIGIDO
+        st.header(f"Lançamento da Posição Diária - {DATA_REF_DATE.strftime('%d/%m/%Y')}")
+        valores_existentes, qtd_existente = carregar_valores_manuais_do_banco(DATA_REF_DATE)
+        with st.form("form_lancamento_unico"):
+            st.subheader("📁 Importação de Relatórios Automáticos")
+            st.caption("💡 **Dica:** Selecione ou arraste todos os relatórios do dia de uma só vez.")
+            arquivos_carregados = st.file_uploader("Selecione os relatórios em lote (Excel / CSV)", type=["xlsx", "xls", "csv"], accept_multiple_files=True, key="up_arquivos_multiplos",)
+            st.divider()
+            st.subheader("📝 Lançamentos Manuais por Empresa")
+            dados_manuais_form = []
+            cols_emp = st.columns(len(empresas_selecionadas))
+            for idx, emp in enumerate(empresas_selecionadas):
+                with cols_emp[idx]:
+                    st.markdown(f"### **{emp}**")
+                    for item_codigo, item_nome in ITENS_MANUAIS:
+                        val_padrao = float(valores_existentes.get(emp, {}).get(item_codigo, 0.0))
+                        qtd_padrao = int(qtd_existente.get(emp, {}).get(item_codigo, 0))
+                        v_input = st.number_input(f"{item_nome} (R$)", value=val_padrao, step=100.0, format="%.2f", key=f"{emp}_{item_codigo}_val",)
+                        qtd_input = 0
+                        if item_codigo in ["NOVOS PAGOS", "USADOS PAGOS"]:
+                            qtd_input = st.number_input(f"Qtd Veículos - {item_nome}", value=qtd_padrao, step=1, key=f"{emp}_{item_codigo}_qtd",)
+                        val_medio = (v_input / qtd_input) if qtd_input > 0 else 0.0
+                        dados_manuais_form.append({"Empresa": emp,"Tipo de Título": item_codigo,"Saldo": float(v_input),"Qtd": int(qtd_input),"ValorMedio": float(val_medio),})
+            st.divider()
+            btn_salvar_tudo = st.form_submit_button("🚀 Salvar e Processar Posição Completa", type="primary", width="stretch")
+            if btn_salvar_tudo:
+                dfs_para_salvar = []
+                with st.spinner("Processando relatórios e lançamentos manuais..."):
+                    if arquivos_carregados:
+                        for fn in [carregar_posicao_analitica, carregar_obrigacoes, carregar_creditos_nao_identificados, carregar_adiantamentos]:
+                            res_df = fn(arquivos_carregados)
+                            if res_df is not None and not res_df.empty:
+                                res_df = res_df.rename(columns={"empresa": "Empresa","tipo_titulo": "Tipo de Título","valor": "Saldo","qtd_veiculos": "Qtd","valor_medio": "ValorMedio"})
+                                dfs_para_salvar.append(res_df)
+                    df_manuais = pd.DataFrame(dados_manuais_form)
+                    if not df_manuais.empty: dfs_para_salvar.append(df_manuais)
+                    if dfs_para_salvar:
+                        df_final = pd.concat(dfs_para_salvar, ignore_index=True)
+                        df_final = df_final.loc[:, ~df_final.columns.duplicated()].copy()
+                        df_final.rename(columns={"empresa": "Empresa","tipo_titulo": "Tipo de Título","valor": "Saldo","qtd_veiculos": "Qtd","valor_medio": "ValorMedio"}, inplace=True)
+                        df_final["Tipo de Título"] = df_final["Tipo de Título"].astype(str).str.strip()
+                        df_final["Empresa"] = df_final["Empresa"].astype(str).str.strip()
+                        df_final["Saldo"] = pd.to_numeric(df_final["Saldo"], errors="coerce").fillna(0.0)
+                        df_final = df_final[df_final["Tipo de Título"]!= "DIF_TRANS_ADIANT"]
+                        novas_linhas_dif = []
+                        for emp in ["MATRIZ", "WS", "EUSEBIO"]:
+                            trans = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "TRANSITORIA")]["Saldo"].sum()
+                            if trans > 0:
+                                adiant = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "ADIANTAMENTOS")]["Saldo"].sum()
+                                diferenca = adiant - trans
+                                novas_linhas_dif.append({"Empresa": emp,"Tipo de Título": "DIF_TRANS_ADIANT","Saldo": diferenca,"Qtd": 0,"ValorMedio": 0.0})
+                        if novas_linhas_dif: df_final = pd.concat([df_final, pd.DataFrame(novas_linhas_dif)], ignore_index=True)
+                        salvar_posicao_no_banco(df_final, DATA_REF_DATE, modo="manutencao")
+                        exibir_popup_sucesso(len(df_final), DATA_REF_DATE)
+                    else: st.warning("Nenhum arquivo válido ou dado manual foi informado.")
 
-    valores_existentes, qtd_existente = carregar_valores_manuais_do_banco(
-        DATA_REF_DATE
-    )
-
-    with st.form("form_lancamento_unico"):
-        # --- Importação de Arquivos Selecionando Todos de Uma Vez ---
-        st.subheader("📁 Importação de Relatórios Automáticos")
-        st.caption(
-            "💡 **Dica:** Selecione ou arraste todos os relatórios do dia de uma só vez."
-        )
-
-        arquivos_carregados = st.file_uploader(
-            "Selecione os relatórios em lote (Excel / CSV)",
-            type=["xlsx", "xls", "csv"],
-            accept_multiple_files=True,
-            key="up_arquivos_multiplos",
-        )
-
-        st.divider()
-
-        # --- Valores Manuais ---
-        st.subheader("📝 Lançamentos Manuais por Empresa")
-        dados_manuais_form = []
-
-        cols_emp = st.columns(len(empresas_selecionadas))
-        for idx, emp in enumerate(empresas_selecionadas):
-            with cols_emp[idx]:
-                st.markdown(f"### **{emp}**")
-
-                for item_codigo, item_nome in ITENS_MANUAIS:
-                    val_padrao = float(
-                        valores_existentes.get(emp, {}).get(item_codigo, 0.0)
-                    )
-                    qtd_padrao = int(
-                        qtd_existente.get(emp, {}).get(item_codigo, 0)
-                    )
-
-                    v_input = st.number_input(
-                        f"{item_nome} (R$)",
-                        value=val_padrao,
-                        step=100.0,
-                        format="%.2f",
-                        key=f"{emp}_{item_codigo}_val",
-                    )
-
-                    qtd_input = 0
-                    if item_codigo in ["NOVOS PAGOS", "USADOS PAGOS"]:
-                        qtd_input = st.number_input(
-                            f"Qtd Veículos - {item_nome}",
-                            value=qtd_padrao,
-                            step=1,
-                            key=f"{emp}_{item_codigo}_qtd",
-                        )
-
-                    val_medio = (
-                        (v_input / qtd_input) if qtd_input > 0 else 0.0
-                    )
-
-                    dados_manuais_form.append(
-                        {
-                            "Empresa": emp,
-                            "Tipo de Título": item_codigo,
-                            "Saldo": float(v_input),
-                            "Qtd": int(qtd_input),
-                            "ValorMedio": float(val_medio),
-                        }
-                    )
-
-        st.divider()
-
-        # --- Botão Único de Ação ---
-        btn_salvar_tudo = st.form_submit_button(
-            "🚀 Salvar e Processar Posição Completa",
-            type="primary",
-            width="stretch",
-        )
-
-        if btn_salvar_tudo:
-            dfs_para_salvar = []
-
-            with st.spinner("Processando relatórios e lançamentos manuais..."):
-                
-                # 1. Processar relatórios usando a lista completa de arquivos enviados
-                if arquivos_carregados:
-                    for fn in [carregar_posicao_analitica, carregar_obrigacoes, carregar_creditos_nao_identificados, carregar_adiantamentos]:
-                        res_df = fn(arquivos_carregados)
-                        if res_df is not None and not res_df.empty:
-                            # Padroniza colunas individualmente antes de juntar
-                            res_df = res_df.rename(columns={
-                                "empresa": "Empresa",
-                                "tipo_titulo": "Tipo de Título",
-                                "valor": "Saldo",
-                                "qtd_veiculos": "Qtd",
-                                "valor_medio": "ValorMedio"
-                            })
-                            dfs_para_salvar.append(res_df)
-
-                # 2. Processar Lançamentos Manuais
-                df_manuais = pd.DataFrame(dados_manuais_form)
-                if not df_manuais.empty:
-                    dfs_para_salvar.append(df_manuais)
-
-                # 3. Concatenar e padronizar
-                if dfs_para_salvar:
-                    df_final = pd.concat(dfs_para_salvar, ignore_index=True)
-                    
-                    # Remove colunas duplicadas que possam ter surgido
-                    df_final = df_final.loc[:, ~df_final.columns.duplicated()].copy()
-
-                    # Garante nomes padronizados
-                    df_final.rename(columns={
-                        "empresa": "Empresa",
-                        "tipo_titulo": "Tipo de Título",
-                        "valor": "Saldo",
-                        "qtd_veiculos": "Qtd",
-                        "valor_medio": "ValorMedio"
-                    }, inplace=True)
-
-                    # --- CÁLCULO SEGURO DA DIF_TRANS_ADIANT ---
-                    # Tratamento das colunas garantindo Series única
-                    df_final["Tipo de Título"] = df_final["Tipo de Título"].astype(str).str.strip()
-                    df_final["Empresa"] = df_final["Empresa"].astype(str).str.strip()
-                    df_final["Saldo"] = pd.to_numeric(df_final["Saldo"], errors="coerce").fillna(0.0)
-
-                    # Remove cálculo anterior do tipo DIF_TRANS_ADIANT
-                    df_final = df_final[df_final["Tipo de Título"] != "DIF_TRANS_ADIANT"]
-
-                    # Regra: Calcula APENAS para empresas onde TRANSITORIA > 0
-                    novas_linhas_dif = []
-                    for emp in ["MATRIZ", "WS", "EUSEBIO"]:
-                        trans = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "TRANSITORIA")]["Saldo"].sum()
-                        
-                        if trans > 0:
-                            adiant = df_final[(df_final["Empresa"] == emp) & (df_final["Tipo de Título"] == "ADIANTAMENTOS")]["Saldo"].sum()
-                            diferenca = adiant - trans
-                            
-                            novas_linhas_dif.append({
-                                "Empresa": emp,
-                                "Tipo de Título": "DIF_TRANS_ADIANT",
-                                "Saldo": diferenca,
-                                "Qtd": 0,
-                                "ValorMedio": 0.0
-                            })
-
-                    if novas_linhas_dif:
-                        df_final = pd.concat([df_final, pd.DataFrame(novas_linhas_dif)], ignore_index=True)
-
-                    # 4. Grava no Banco
-                    salvar_posicao_no_banco(
-                        df_final, DATA_REF_DATE, modo="manutencao"
-                    )
-                    # Chama o Popup com o total de registros salvos
-                    exibir_popup_sucesso(len(df_final), DATA_REF_DATE)
-                else:
-                    st.warning(
-                        "Nenhum arquivo válido ou dado manual foi informado."
-                    )
-
-
-# ========== ABA 2: HISTÓRICO E EXPORTAÇÃO ==========
-with tab2:
-    st.markdown("### Exportar Posição do Dia")
-    col1, col2 = st.columns(2)
-    with col1:
-        data_export = st.date_input(
-            "Selecione a Data", value=DATA_REF_DATE, key="data_export"
-        )
-    with col2:
-        empresas_export = st.multiselect(
-            "Empresas",
-            ["MATRIZ", "WS", "EUSEBIO"],
-            default=empresas_selecionadas,
-            key="emp_export",
-        )
-
-    st.markdown("#### Preview da Planilha")
-    df_preview = montar_df_dashboard(data_export, empresas_export)
-    if df_preview is not None:
-        st.dataframe(df_preview, width="stretch", hide_index=True)
-        st.divider()
-        if st.button("📊 Gerar Excel Dashboard", type="primary"):
-            with st.spinner("Montando planilha..."):
-                excel_data = gerar_excel_dashboard(data_export, empresas_export)
-            if excel_data:
-                st.download_button(
-                    label="📥 Baixar Planilha",
-                    data=excel_data,
-                    file_name=f"Posicao_{data_export.strftime('%d%m%Y')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                )
-                st.success("Planilha pronta para download!")
-    else:
-        st.warning(
-            "Nenhum dado encontrado para a data e empresas selecionadas"
-        )
+# ========== ABA 2: HISTÓRICO ==========
+if "Histórico" in tab_dict:
+    with tab_dict["Histórico"]:
+        #st.markdown('<h1 class="main-title">Dashboard Financeira Diária</h1>', unsafe_allow_html=True) # CORRIGIDO
+        st.markdown("### Exportar Posição do Dia")
+        col1, col2 = st.columns(2)
+        with col1: data_export = st.date_input("Selecione a Data", value=DATA_REF_DATE, key="data_export")
+        with col2: empresas_export = st.multiselect("Empresas",["MATRIZ", "WS", "EUSEBIO"],default=empresas_selecionadas,key="emp_export",)
+        st.markdown("#### Preview da Planilha")
+        df_preview = montar_df_dashboard(data_export, empresas_export)
+        if df_preview is not None:
+            st.dataframe(df_preview, width="stretch", hide_index=True)
+            st.divider()
+            if st.button("📊 Gerar Excel Dashboard", type="primary"):
+                with st.spinner("Montando planilha..."): excel_data = gerar_excel_dashboard(data_export, empresas_export)
+                if excel_data:
+                    st.download_button(label="📥 Baixar Planilha",data=excel_data,file_name=f"Posicao_{data_export.strftime('%d%m%Y')}.xlsx",mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",)
+                    st.success("Planilha pronta para download!")
+        else: st.warning("Nenhum dado encontrado para a data e empresas selecionadas")
 
 # ========== ABA 3: MANUTENÇÃO ==========
-with tab3:
-    st.subheader("Manutenção de Dados Carregados")
-    st.warning("Edite ou exclua valores já lançados por data e empresa")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        data_manut = st.date_input(
-            "Selecione a Data", format="DD/MM/YYYY", key="data_manut_aba3"
-        )
-    with col2:
-        empresa_manut = st.selectbox(
-            "Empresa",
-            ["TODAS", "MATRIZ", "WS", "EUSEBIO"],
-            key="empresa_manut_aba3",
-        )
-
-    if st.button("Carregar Dados da Data", key="btn_carregar_manut"):
-        with SessionLocal() as session:
-            query = session.query(PosicaoDiaria).filter(
-                PosicaoDiaria.data == data_manut
-            )
-            if empresa_manut != "TODAS":
-                query = query.filter(PosicaoDiaria.empresa == empresa_manut)
-            registros = query.all()
-
-            if not registros:
-                st.info("Nenhum dado encontrado para essa data/empresa")
-                st.session_state.pop("df_manut", None)
-            else:
-                df_manut = pd.DataFrame(
-                    [
-                        {
-                            "id": r.id,
-                            "tipo_de_titulo": r.tipo_titulo,
-                            "empresa": r.empresa,
-                            "saldo": r.valor or 0.0,
-                        }
-                        for r in registros
-                    ]
-                )
-                df_manut = df_manut.sort_values("tipo_de_titulo")
-                st.session_state["df_manut"] = df_manut
-
-    if "df_manut" in st.session_state and not st.session_state["df_manut"].empty:
-        st.write("Edite os valores e clique em Salvar")
-        df_editado = st.data_editor(
-            st.session_state["df_manut"],
-            column_config={
-                "id": st.column_config.NumberColumn("ID", disabled=True),
-                "tipo_de_titulo": st.column_config.TextColumn(
-                    "Tipo", disabled=True
-                ),
-                "empresa": st.column_config.TextColumn(
-                    "Empresa", disabled=True
-                ),
-                "saldo": st.column_config.NumberColumn(
-                    "Saldo R$", format="R$ %.2f", step=0.01
-                ),
-            },
-            hide_index=True,
-            width="stretch",
-        )
-
-        col_btn1, col_btn2 = st.columns(2)
-        with col_btn1:
-            if st.button("💾 Salvar Alterações", key="btn_salvar_manut"):
-                with SessionLocal() as session:
-                    for _, row in df_editado.iterrows():
-                        reg = (
-                            session.query(PosicaoDiaria)
-                            .filter(PosicaoDiaria.id == row["id"])
-                            .first()
-                        )
-                        if reg:
-                            reg.valor = float(row["saldo"])
-                    session.commit()
-                st.cache_data.clear()
-                st.success("Alterações salvas com sucesso!")
-                del st.session_state["df_manut"]
-                st.rerun()
+if "Manutenção" in tab_dict:
+    with tab_dict["Manutenção"]:
+        #st.markdown('<h1 class="main-title">Dashboard Financeira Diária</h1>', unsafe_allow_html=True) # CORRIGIDO
+        st.subheader("Manutenção de Dados Carregados")
+        st.warning("Edite ou exclua valores já lançados por data e empresa")
+        col1, col2 = st.columns(2)
+        with col1: data_manut = st.date_input("Selecione a Data", format="DD/MM/YYYY", key="data_manut_aba3")
+        with col2: empresa_manut = st.selectbox("Empresa",["TODAS", "MATRIZ", "WS", "EUSEBIO"],key="empresa_manut_aba3",)
+        if st.button("Carregar Dados da Data", key="btn_carregar_manut"):
+            with SessionLocal() as session:
+                query = session.query(PosicaoDiaria).filter(PosicaoDiaria.data == data_manut)
+                if empresa_manut!= "TODAS": query = query.filter(PosicaoDiaria.empresa == empresa_manut)
+                registros = query.all()
+                if not registros: st.info("Nenhum dado encontrado para essa data/empresa"); st.session_state.pop("df_manut", None)
+                else:
+                    df_manut = pd.DataFrame([{"id": r.id,"tipo_de_titulo": r.tipo_titulo,"empresa": r.empresa,"saldo": r.valor or 0.0,} for r in registros])
+                    df_manut = df_manut.sort_values("tipo_de_titulo"); st.session_state["df_manut"] = df_manut
+        if "df_manut" in st.session_state and not st.session_state["df_manut"].empty:
+            st.write("Edite os valores e clique em Salvar")
+            df_editado = st.data_editor(st.session_state["df_manut"], column_config={"id": st.column_config.NumberColumn("ID", disabled=True),"tipo_de_titulo": st.column_config.TextColumn("Tipo", disabled=True),"empresa": st.column_config.TextColumn("Empresa", disabled=True),"saldo": st.column_config.NumberColumn("Saldo R$", format="R$ %.2f", step=0.01),}, hide_index=True, width="stretch",)
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                if st.button("💾 Salvar Alterações", key="btn_salvar_manut"):
+                    with SessionLocal() as session:
+                        for _, row in df_editado.iterrows(): reg = session.query(PosicaoDiaria).filter(PosicaoDiaria.id == row["id"]).first(); reg.valor = float(row["saldo"]) if reg else None
+                        session.commit()
+                    st.cache_data.clear(); st.success("Alterações salvas com sucesso!"); del st.session_state["df_manut"]; st.rerun()
 
 # ========== ABA 4: GRÁFICOS ==========
-with tab4:
-    st.header("Gráficos")
-
-    df = get_all_data()
-    df.columns = df.columns.str.lower()
-
-    if not df.empty:
-        df["data"] = pd.to_datetime(df["data"])
-
-        st.subheader("Filtros")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            data_inicio = st.date_input("Data Início", df["data"].min())
-        with col2:
-            data_fim = st.date_input("Data Fim", df["data"].max())
-        with col3:
-            # Limpa NaN e vazios antes de mostrar no filtro
-            empresas_disponiveis = df["empresa"].dropna().astype(str).str.strip()
-            empresas_disponiveis = empresas_disponiveis[empresas_disponiveis != '']
-            empresas_disponiveis = empresas_disponiveis[empresas_disponiveis.str.lower() != 'nan']
-            empresas_disponiveis = empresas_disponiveis.unique()
-            
-            empresas_filtro = st.multiselect(
-                "Filtrar Empresas",
-                empresas_disponiveis,
-                default=empresas_disponiveis,
-            )
-        
-        mask = (
-            (df["data"] >= pd.to_datetime(data_inicio))
-            & (df["data"] <= pd.to_datetime(data_fim))
-            & (df["empresa"].astype(str).str.strip().isin(empresas_filtro))
-        )
-        df_filtrado = df[mask].copy()
-        df_filtrado = df[mask].copy()
-
-        if not df_filtrado.empty:
-            # --- APLICAÇÃO DA REGRA DE NEGÓCIO NOS GRÁFICOS/KPIs ---
-            # Recalcula o valor líquido correto por linha
-            def aplicar_regra_linha(row):
-                tipo = str(row.get("tipo_titulo", "")).strip().upper()
-                val = float(row.get("valor", 0.0) or 0.0)
-
-                if "OBRIG" in tipo:
-                    return -abs(val)
-                elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]:
-                    return 0.0
-                else:
-                    return abs(val)
-
-            df_filtrado["valor_liquido"] = df_filtrado.apply(
-                aplicar_regra_linha, axis=1
-            )
-
-            # Agrupamento para gráfico de linha utilizando o valor_liquido
-            df_total_valor = (
-                df_filtrado.groupby(["data", "empresa"])["valor_liquido"]
-                .sum()
-                .reset_index()
-                .rename(columns={"valor_liquido": "valor"})
-            )
-
-            if "qtd_veiculos" in df_filtrado.columns:
-                df_total_qtd = (
-                    df_filtrado.groupby(["data", "empresa"])["qtd_veiculos"]
-                    .sum()
-                    .reset_index()
-                )
-            else:
-                df_total_qtd = pd.DataFrame()
-
-            data_hoje = df_filtrado["data"].max()
-            df_dia = df_filtrado[df_filtrado["data"] == data_hoje].copy()
-
-            st.subheader("KPIs do Período")
-            kpi1, kpi2, kpi3 = st.columns(3)
-
-            # Totais recalculados corretamente usando a coluna valor_liquido
-            total_geral = df_filtrado["valor_liquido"].sum()
-            total_dia = (
-                df_dia["valor_liquido"].sum() if not df_dia.empty else 0
-            )
-            media_dia = (
-                df_total_valor.groupby("data")["valor"].sum().mean()
-                if not df_total_valor.empty
-                else 0
-            )
-
-            with kpi1:
-                st.metric(
-                    "Total R$",
-                    f"R$ {total_geral:,.2f}".replace(",", "X")
-                    .replace(".", ",")
-                    .replace("X", "."),
-                )
-            with kpi2:
-                st.metric(
-                    f"Dia {data_hoje.strftime('%d/%m')}",
-                    f"R$ {total_dia:,.2f}".replace(",", "X")
-                    .replace(".", ",")
-                    .replace("X", "."),
-                )
-            with kpi3:
-                st.metric(
-                    "Média/Dia",
-                    f"R$ {media_dia:,.2f}".replace(",", "X")
-                    .replace(".", ",")
-                    .replace("X", "."),
-                )
-
-            st.subheader("1. Evolução do TOTAL R$ por Empresa")
-            fig1 = px.line(
-                df_total_valor,
-                x="data",
-                y="valor",
-                color="empresa",
-                markers=True,
-            )
-            fig1.update_layout(height=400)
-            fig1.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
-            st.plotly_chart(fig1, width="stretch")
-
-            st.subheader(
-                f"2. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}"
-            )
-            # Utiliza valor_liquido para refletir obrigações (negativas) e zera transitórias
-            fig3 = px.bar(
-                df_dia,
-                x="tipo_titulo",
-                y="valor_liquido",
-                color="empresa",
-                barmode="group",
-            )
-            fig3.update_layout(
-                height=400, xaxis_tickangle=-45, yaxis_title="Valor Líquido R$"
-            )
-            fig3.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
-            st.plotly_chart(fig3, width="stretch")
-
-            st.subheader(
-                f"4. Distribuição % por Conta - {data_hoje.strftime('%d/%m/%Y')}"
-            )
-            # Filtra itens com saldo zero/transitórias e calcula a distribuição em valor absoluto
-            df_pizza = (
-                df_dia[df_dia["valor_liquido"] != 0]
-                .groupby("tipo_titulo")["valor_liquido"]
-                .sum()
-                .abs()
-                .reset_index()
-            )
-
-            if not df_pizza.empty:
-                fig4 = px.pie(
-                    df_pizza,
-                    names="tipo_titulo",
-                    values="valor_liquido",
-                    hole=0.4,
-                )
-                fig4.update_traces(
-                    texttemplate="%{label}<br>R$ %{value:,.2f}<br>%{percent}"
-                )
-                fig4.update_layout(height=400)
-                st.plotly_chart(fig4, width="stretch")
-            else:
-                st.info("Sem dados relevantes para o gráfico de distribuição no dia.")
-
-        else:
-            st.warning("Nenhum dado encontrado para os filtros selecionados.")
-
-    else:
-        st.warning("Não há dados no banco ainda.")
+if "Graficos" in tab_dict:
+    with tab_dict["Graficos"]:
+        #st.markdown('<h1 class="main-title">Dashboard Financeira Diária</h1>', unsafe_allow_html=True) # CORRIGIDO
+        st.header("Gráficos")
+        df = get_all_data(); df.columns = df.columns.str.lower()
+        if not df.empty:
+            df["data"] = pd.to_datetime(df["data"])
+            st.subheader("Filtros")
+            col1, col2, col3 = st.columns(3)
+            with col1: data_inicio = st.date_input("Data Inícial", df["data"].min())
+            with col2: data_fim = st.date_input("Data Final", df["data"].max())
+            with col3:
+                empresas_disponiveis = df["empresa"].dropna().astype(str).str.strip()
+                empresas_disponiveis = empresas_disponiveis[empresas_disponiveis!= '']; empresas_disponiveis = empresas_disponiveis[empresas_disponiveis.str.lower()!= 'nan']
+                empresas_disponiveis = empresas_disponiveis.unique()
+                empresas_filtro = st.multiselect("Filtrar Empresas", empresas_disponiveis, default=empresas_disponiveis,)
+            mask = ((df["data"] >= pd.to_datetime(data_inicio)) & (df["data"] <= pd.to_datetime(data_fim)) & (df["empresa"].astype(str).str.strip().isin(empresas_filtro)))
+            df_filtrado = df[mask].copy()
+            if not df_filtrado.empty:
+                def aplicar_regra_linha(row):
+                    tipo = str(row.get("tipo_titulo", "")).strip().upper(); val = float(row.get("valor", 0.0) or 0.0)
+                    if "OBRIG" in tipo: return -abs(val)
+                    elif tipo in ["TRANSITORIA", "DIF_TRANS_ADIANT"]: return 0.0
+                    else: return abs(val)
+                df_filtrado["valor_liquido"] = df_filtrado.apply(aplicar_regra_linha, axis=1)
+                df_total_valor = df_filtrado.groupby(["data", "empresa"])["valor_liquido"].sum().reset_index().rename(columns={"valor_liquido": "valor"})
+                data_hoje = df_filtrado["data"].max(); df_dia = df_filtrado[df_filtrado["data"] == data_hoje].copy()
+                st.subheader("KPIs do Período")
+                kpi1, kpi2, kpi3 = st.columns(3)
+                total_geral = df_filtrado["valor_liquido"].sum()
+                total_dia = df_dia["valor_liquido"].sum() if not df_dia.empty else 0
+                media_dia = df_total_valor.groupby("data")["valor"].sum().mean() if not df_total_valor.empty else 0
+                with kpi1: st.metric("Total R$", f"R$ {total_geral:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                with kpi2: st.metric(f"Dia {data_hoje.strftime('%d/%m')}", f"R$ {total_dia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                with kpi3: st.metric("Média/Dia", f"R$ {media_dia:,.2f}".replace(",", "X").replace(".", ",").replace("X", "."))
+                st.subheader("1. Evolução do TOTAL R$ por Empresa")
+                fig1 = px.line(df_total_valor, x="data", y="valor", color="empresa", markers=True)
+                fig1.update_layout(height=400); fig1.update_yaxes(tickprefix="R$ ", tickformat=",.2f"); st.plotly_chart(fig1, width="stretch")
+                st.subheader(f"2. Composição R$ por Conta - {data_hoje.strftime('%d/%m/%Y')}")
+                fig3 = px.bar(df_dia, x="tipo_titulo", y="valor_liquido", color="empresa", barmode="group")
+                fig3.update_layout(height=400, xaxis_tickangle=-45, yaxis_title="Valor Líquido R$"); fig3.update_yaxes(tickprefix="R$ ", tickformat=",.2f"); st.plotly_chart(fig3, width="stretch")
+                st.subheader(f"4. Distribuição % por Conta - {data_hoje.strftime('%d/%m/%Y')}")
+                df_pizza = df_dia[df_dia["valor_liquido"]!= 0].groupby("tipo_titulo")["valor_liquido"].sum().abs().reset_index()
+                if not df_pizza.empty:
+                    fig4 = px.pie(df_pizza, names="tipo_titulo", values="valor_liquido", hole=0.4)
+                    fig4.update_traces(texttemplate="%{label}<br>R$ %{value:,.2f}<br>%{percent}"); fig4.update_layout(height=400); st.plotly_chart(fig4, width="stretch")
+                else: st.info("Sem dados relevantes para o gráfico de distribuição no dia.")
+            else: st.warning("Nenhum dado encontrado para os filtros selecionados.")
+        else: st.warning("Não há dados no banco ainda.")
