@@ -931,17 +931,24 @@ with tab4:
         with col2:
             data_fim = st.date_input("Data Fim", df["data"].max())
         with col3:
+            # Limpa NaN e vazios antes de mostrar no filtro
+            empresas_disponiveis = df["empresa"].dropna().astype(str).str.strip()
+            empresas_disponiveis = empresas_disponiveis[empresas_disponiveis != '']
+            empresas_disponiveis = empresas_disponiveis[empresas_disponiveis.str.lower() != 'nan']
+            empresas_disponiveis = empresas_disponiveis.unique()
+            
             empresas_filtro = st.multiselect(
                 "Filtrar Empresas",
-                df["empresa"].unique(),
-                default=df["empresa"].unique(),
+                empresas_disponiveis,
+                default=empresas_disponiveis,
             )
-
+        
         mask = (
             (df["data"] >= pd.to_datetime(data_inicio))
             & (df["data"] <= pd.to_datetime(data_fim))
-            & (df["empresa"].isin(empresas_filtro))
+            & (df["empresa"].astype(str).str.strip().isin(empresas_filtro))
         )
+        df_filtrado = df[mask].copy()
         df_filtrado = df[mask].copy()
 
         if not df_filtrado.empty:
