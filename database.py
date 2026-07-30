@@ -3,14 +3,14 @@ import streamlit as st
 from sqlalchemy import create_engine, Column, String, Boolean, Integer, Date, Numeric, Float, func
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = st.secrets["DATABASE_URL"]
-#import os
+#DATABASE_URL = st.secrets["DATABASE_URL"]
+import os
 
 # Tenta pegar da variável de ambiente do Render; se não achar, busca no secrets.toml local
-#DATABASE_URL = os.getenv("DATABASE_URL") or st.secrets.get("DATABASE_URL")
-#engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
-#SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-#Base = declarative_base()
+DATABASE_URL = os.getenv("DATABASE_URL") or st.secrets.get("DATABASE_URL")
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=300)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 class Usuarios(Base):
     __tablename__ = "usuarios"
